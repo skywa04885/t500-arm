@@ -3,6 +3,15 @@
 
 #include "stm32f446.h"
 
+/* Timing */
+
+#define APB1_SPEED					45000000
+
+/* Status */
+
+#define STATUS_BASE					GPIOC_BASE
+#define STATUS_CLKREADY				10
+
 /* Stepper0 */
 
 #define STEPPER0_BASE				GPIOB_BASE
