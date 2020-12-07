@@ -1,0 +1,5 @@
+stepper.c:3:6:stepper_init	16	static
+stepper.c:46:6:stepper_set_dir	0	static
+stepper.c:60:6:stepper_enable	0	static
+stepper.c:66:6:stepper_disable	0	static
+stepper.c:72:6:stepper_simple_move	8	static

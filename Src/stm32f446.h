@@ -2,38 +2,60 @@
 #define _STM32F446_H
 
 /***********************************
+ * NVIC
+ ***********************************/
+
+typedef struct __attribute__ (( packed ))
+{
+	uint32_t iser0;
+	uint32_t iser1;
+	uint32_t iser2;
+	uint32_t iser3;
+	uint32_t iser4;
+	uint32_t iser5;
+	uint32_t iser6;
+	uint32_t iser7;
+} nvic_iser_t;
+
+#define NVIC_ISER						((nvic_iser_t *) 0xE000E100)
+
+typedef struct __attribute__ (( packed ))
+{
+	uint32_t icpr0;
+	uint32_t icpr1;
+	uint32_t icpr2;
+	uint32_t icpr3;
+	uint32_t icpr4;
+	uint32_t icpr5;
+	uint32_t icpr6;
+	uint32_t icpr7;
+} nvic_icpr_t;
+
+#define NVIC_ICPR						((nvic_icpr_t *) 0xE000E280)
+
+#define NVIC_ISER0_TIM2					28
+#define NVIC_ISER0_TIM3					29
+#define NVIC_ISER0_TIM4					30
+
+/***********************************
  * Flash
  ***********************************/
 
 #define FLASH_BASE				0x40023C00
-
-/* Flash Offsets */
-
 #define FLASH_ACR				((uint32_t *) (FLASH_BASE + 0x00))
 
-/* FLASH_ACR */
-
+/* Flash ACR */
 #define FLASH_ACR_DCEN			10
 #define FLASH_ACR_ICEN			9
 #define FLASH_ACR_PRFTEN			8
-#define FLASH_ACR_LATENCY(A)		(A << 0)
+
+#define FLASH_LATENCY(A)			(A << 0)
 
 /***********************************
  * PWR
  ***********************************/
 
 #define PWR_BASE					0x40007000
-
-/* PWR Offsets */
-
-#define PWR_CR					((uint32_t *) (RCC_BASE + 0x00))
-
-/* PWR_CR */
-
-#define PWR_CR_VOS(A)			(A << 14)
-#define PWR_CR_VOS_SCALEM3		0b01
-#define PWR_CR_VOS_SCALEM2		0b10
-#define PWR_CR_VOS_SCALEM1		0b11
 
 /***********************************
  * RCC
@@ -51,47 +73,39 @@
 
 /* RCC_PLLCFGR */
 
-#define RCC_PLLCFGR_PLLQ(A)		(A << 24)
-
-#define RCC_PLLCFGR_PLLP(A)		(A << 16)
-#define RCC_PLLCFGR_PLLP_2		0b00
-#define RCC_PLLCFGR_PLLP_4		0b01
-#define RCC_PLLCFGR_PLLP_6		0b10
-#define RCC_PLLCFGR_PLLP_8		0b11
-
-#define RCC_PLLCFGR_PLLN(A)		(A << 6)
-
 #define RCC_PLLCFGR_PLLR(A)		(A << 28)
+#define RCC_PLLCFGR_PLLR_MASK	RCC_PLLCFGR_PLLR(0b111)
 
-#define RCC_PLLCFGR_PLLM(A)		(A << 0)
+#define RCC_PLLCFGR_PLLQ(A)		(A << 24)
+#define RCC_PLLCFGR_PLLQ_MASK	RCC_PLLCFGR_PLLQ(0b1111)
 
 #define RCC_PLLCFGR_PLLSRC		22
 
+#define RCC_PLLCFGR_PLLP(A)		(A << 16)
+#define RCC_PLLCFGR_PLLP_MASK	RCC_PLLCFGR_PLLP(0b11)
+#define RCC_PLLCFGR_PLLP_DIV2	0b00
+#define RCC_PLLCFGR_PLLP_DIV4	0b01
+#define RCC_PLLCFGR_PLLP_DIV6	0b10
+#define RCC_PLLCFGR_PLLP_DIV8	0b11
+
+#define RCC_PLLCFGR_PLLN(A)		(A << 6)
+#define RCC_PLLCFGR_PLLN_MASK	RCC_PLLCFGR_PLLN(0b111111111)
+
+#define RCC_PLLCFGR_PLLM(A)		(A << 0)
+#define RCC_PLLCFGR_PLLM_MASK	RCC_PLLCFGR_PLLM(0b111111)
+
+/* RCC_CR */
+
+#define RCC_CR_PLLRDY			25
+#define RCC_CR_PLLON				24
+#define RCC_CR_HSEON				16
+#define RCC_CR_HSERDY			17
+
 /* RCC_CFGR */
 
-#define RCC_CFGR_SW(A)			(A << 0)
-#define RCC_CFGR_SW_PLL_P		0b10
-
-#define RCC_CFGR_SWS(A)			(A << 2)
-#define RCC_CFGR_SWS_MASK		(0b11 << 2)
-#define RCC_CFGR_SWS_PLL			0b10
-
-#define RCC_CFGR_PPRE1(A)		(A << 10)
-#define RCC_CFGR_PPRE1_NODIV		0b000
-#define RCC_CFGR_PPRE1_DIV2		0b100
-#define RCC_CFGR_PPRE1_DIV4		0b101
-#define RCC_CFGR_PPRE1_DIV8		0b110
-#define RCC_CFGR_PPRE1_DIV16		0b111
-
-#define RCC_CFGR_PPRE2(A)		(A << 10)
-#define RCC_CFGR_PPRE2_NODIV		0b000
-#define RCC_CFGR_PPRE2_DIV2		0b100
-#define RCC_CFGR_PPRE2_DIV4		0b101
-#define RCC_CFGR_PPRE2_DIV8		0b110
-#define RCC_CFGR_PPRE2_DIV16		0b111
-
 #define RCC_CFGR_HPRE(A)			(A << 4)
-#define RCC_CFGR_HPRE_NODIV		0b0000
+#define RCC_CFGR_HPRE_MASK		RCC_CFGR_HPRE(0b1111)
+#define RCC_CFGR_HPRE_NDIV		0b0000
 #define RCC_CFGR_HPRE_DIV2		0b1000
 #define RCC_CFGR_HPRE_DIV4		0b1001
 #define RCC_CFGR_HPRE_DIV8		0b1010
@@ -101,15 +115,47 @@
 #define RCC_CFGR_HPRE_DIV256		0b1110
 #define RCC_CFGR_HPRE_DIV512		0b1111
 
-/* RCC_RC */
+#define RCC_CFGR_PPRE2(A)		(A << 13)
+#define RCC_CFGR_PPRE2_MASK		RCC_CFGR_PPRE2(0b111)
+#define RCC_CFGR_PPRE2_NDIV		0b000
+#define RCC_CFGR_PPRE2_DIV2		0b100
+#define RCC_CFGR_PPRE2_DIV4		0b101
+#define RCC_CFGR_PPRE2_DIV8		0b110
+#define RCC_CFGR_PPRE2_DIV16		0b111
 
-#define RCC_CR_HSEON				16
-#define RCC_CR_HSERDY			17
-#define RCC_CR_PLLON				24
-#define RCC_CR_PLLRDY			25
+#define RCC_CFGR_PPRE1(A)		(A << 10)
+#define RCC_CFGR_PPRE1_MASK		RCC_CFGR_PPRE1(0b111)
+#define RCC_CFGR_PPRE1_NDIV		0b000
+#define RCC_CFGR_PPRE1_DIV2		0b100
+#define RCC_CFGR_PPRE1_DIV4		0b101
+#define RCC_CFGR_PPRE1_DIV8		0b110
+#define RCC_CFGR_PPRE1_DIV16		0b111
+
+#define RCC_CFGR_SW(A)			(A << 0)
+#define RCC_CFGR_SW_MASK			RCC_CFGR_SW(0b11)
+#define RCC_CFGR_SW_HSI			0b00
+#define RCC_CFGR_SW_HSE			0b01
+#define RCC_CFGR_SW_PLL_P		0b10
+#define RCC_CFGR_SW_PLL_R		0b11
+
+#define RCC_CFGR_SWS(A)			(A << 2)
+#define RCC_CFGR_SWS_MASK		RCC_CFGR_SWS(0b11)
+#define RCC_CFGR_SWS_HSI			0b00
+#define RCC_CFGR_SWS_HSE			0b01
+#define RCC_CFGR_SWS_PLL			0b10
+#define RCC_CFGR_SWS_PLL_R		0b11
 
 /* RCC_APB1ENR */
 
+#define RCC_APB1ENR_TIM14EN		8
+#define RCC_APB1ENR_TIM13EN		7
+#define RCC_APB1ENR_TIM12EN		6
+#define RCC_APB1ENR_TIM7EN		5
+#define RCC_APB1ENR_TIM6EN		4
+#define RCC_APB1ENR_TIM5EN		3
+#define RCC_APB1ENR_TIM4EN		2
+#define RCC_APB1ENR_TIM3EN		1
+#define RCC_APB1ENR_TIM2EN		0
 #define RCC_APB1ENR_PWREN		28
 
 /* RCC_AHB1ENR Bits */
@@ -213,30 +259,55 @@
 
 /* Timer offsets */
 
-#define TIM_CR1(A)				((uint32_t *) (A + 0x00))
-#define TIM_CR2(A)				((uint32_t *) (A + 0x04))
-#define TIM_SMCR(A)				((uint32_t *) (A + 0x08))
-#define TIM_DIER(A)				((uint32_t *) (A + 0x0C))
-#define TIM_SR(A)				((uint32_t *) (A + 0x10))
-#define TIM_EGR(A)				((uint32_t *) (A + 0x14))
-#define TIM_CCMR1(A)				((uint32_t *) (A + 0x18))
-#define TIM_CCMR2(A)				((uint32_t *) (A + 0x1C))
-#define TIM_CCER(A)				((uint32_t *) (A + 0x20))
+#define TIM_CR1(A)				((uint16_t *) (A + 0x00))
+#define TIM_CR2(A)				((uint16_t *) (A + 0x04))
+#define TIM_SMCR(A)				((uint16_t *) (A + 0x08))
+#define TIM_DIER(A)				((uint16_t *) (A + 0x0C))
+#define TIM_SR(A)				((uint16_t *) (A + 0x10))
+#define TIM_EGR(A)				((uint16_t *) (A + 0x14))
+#define TIM_CCMR1(A)				((uint16_t *) (A + 0x18))
+#define TIM_CCMR2(A)				((uint16_t *) (A + 0x1C))
+#define TIM_CCER(A)				((uint16_t *) (A + 0x20))
 #define TIM_CNT(A)				((uint32_t *) (A + 0x24))
-#define TIM_PSC(A)				((uint32_t *) (A + 0x28))
+#define TIM_PSC(A)				((uint16_t *) (A + 0x28))
 #define TIM_ARR(A)				((uint32_t *) (A + 0x2C))
-#define TIM_RCR(A)				((uint32_t *) (A + 0x30))
+#define TIM_RCR(A)				((uint16_t *) (A + 0x30))
 #define TIM_CCR1(A)				((uint32_t *) (A + 0x34))
 #define TIM_CCR2(A)				((uint32_t *) (A + 0x38))
 #define TIM_CCR3(A)				((uint32_t *) (A + 0x3C))
 #define TIM_CCR4(A)				((uint32_t *) (A + 0x40))
-#define TIM_BDTR(A)				((uint32_t *) (A + 0x44))
-#define TIM_DCR(A)				((uint32_t *) (A + 0x48))
-#define TIM_DMAR(A)				((uint32_t *) (A + 0x4C))
+#define TIM_BDTR(A)				((uint16_t *) (A + 0x44))
+#define TIM_DCR(A)				((uint16_t *) (A + 0x48))
+#define TIM_DMAR(A)				((uint16_t *) (A + 0x4C))
+
+/* TIM_SR */
+
+#define TIM_SR_UIF				0
+
+/* TIM_CCMR1 */
+
+#define TIM_CCMR1_OC1FE			2
+#define TIM_CCMR1_OC1PE			3
+#define TIM_CCMR1_OC1CE			7
+
+#define TIM_CCMR1_OC2FE			10
+#define TIM_CCMR1_OC2PE			11
+#define TIM_CCMR1_OC2CE			15
+
+#define TIM_CCMR1_OC1M(A)		(A << 4)
+#define TIM_CCMR1_OC1M_MASK		TIM_CCMR1_OC1M(0b111)
+#define TIM_CCMR1_OC1M_FROZEN	0b000
+#define TIM_CCMR1_OC1M_ACTIVE	0b101
 
 /* TIM1_CR1 */
 
 #define TIM_CR1_ARPE				7
 #define TIM_CR1_CEN				0
+#define TIM_CR1_UDIS				1
+
+/* TIM_DIER */
+
+#define TIM_DIER_CC1IE			1
+#define TIM_DIER_UIE				0
 
 #endif
