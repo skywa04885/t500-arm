@@ -10,7 +10,7 @@
 #include "commands.h"
 
 #define NEMA17_MIN_SPS				300
-#define NEMA17_MAX_SPS				20000
+#define NEMA17_MAX_SPS				12000
 #define NEMA17_SPS_INC				2
 
 #endif

@@ -61,6 +61,7 @@ typedef struct {
 			{ \
 				if (STEPPER.auto_enable_disable) stepper_disable(&STEPPER); \
 				STEPPER.stepper_moving = false; \
+				STEPPER.cop.current_sps = 0; \
 				*TIM_CR1(STEPPER.timer_base ) = 0; \
 				return; \
 			} \

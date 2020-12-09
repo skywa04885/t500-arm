@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../Src/commands.c \
 ../Src/delay.c \
 ../Src/main.c \
 ../Src/stepper.c \
@@ -12,6 +13,7 @@ C_SRCS += \
 ../Src/usart.c 
 
 OBJS += \
+./Src/commands.o \
 ./Src/delay.o \
 ./Src/main.o \
 ./Src/stepper.o \
@@ -20,6 +22,7 @@ OBJS += \
 ./Src/usart.o 
 
 C_DEPS += \
+./Src/commands.d \
 ./Src/delay.d \
 ./Src/main.d \
 ./Src/stepper.d \
@@ -29,6 +32,8 @@ C_DEPS += \
 
 
 # Each subdirectory must supply rules for building sources it contributes
+Src/commands.o: ../Src/commands.c
+	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -DSTM32 -DSTM32F4 -DSTM32F446RETx -DNUCLEO_F446RE -c -I../Inc -Os -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"Src/commands.d" -MT"$@" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
 Src/delay.o: ../Src/delay.c
 	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -DSTM32 -DSTM32F4 -DSTM32F446RETx -DNUCLEO_F446RE -c -I../Inc -Os -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"Src/delay.d" -MT"$@" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
 Src/main.o: ../Src/main.c

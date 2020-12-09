@@ -1,3 +1,4 @@
+"Src/commands.o"
 "Src/delay.o"
 "Src/main.o"
 "Src/stepper.o"

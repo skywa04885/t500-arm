@@ -12,7 +12,7 @@ static stepper_t stepper0 = {
 		.position = 0,
 		.timer_base = TIM2_BASE,
 		.min_sps = NEMA17_MIN_SPS,
-		.max_sps = NEMA17_MAX_SPS,
+		.max_sps = 20000,
 		.sps_inc = NEMA17_SPS_INC,
 		.timing = {
 				.presc = 90
@@ -56,6 +56,15 @@ static stepper_t stepper3 = {
 		.min_sps = NEMA17_MIN_SPS,
 		.max_sps = NEMA17_MAX_SPS,
 		.sps_inc = NEMA17_SPS_INC,
+};
+
+static const char *device_id = "LUKESTE0";
+
+static stepper_t *motors[] = {
+		&stepper0,
+		&stepper1,
+		&stepper2,
+		&stepper3
 };
 
 /***********************************
@@ -125,20 +134,6 @@ void steppers_init(void)
 	NVIC_ISER->iser0 |= (1 << NVIC_ISER0_TIM3) | (1 << NVIC_ISER0_TIM2);
 }
 
-stepper_t* get_stepper_from_command_motor(command_motor_t motor)
-{
-	stepper_t *stepper = NULL;
-	switch (motor)
-	{
-		case COMMAND_MOTOR0: stepper = &stepper0; break;
-		case COMMAND_MOTOR1: stepper = &stepper1; break;
-		case COMMAND_MOTOR2: stepper = &stepper2; break;
-		case COMMAND_MOTOR3: stepper = &stepper3; break;
-		default: break;
-	}
-	return stepper;
-}
-
 /**
  * Gets called by startup code
  */
@@ -159,10 +154,10 @@ int main(void)
 
     /* Loop forever */
 //	stepper_simple_move(&stepper0, 100000);
-//	stepper_simple_move(&stepper0, 100000);
+
 //	stepper_simple_move(&stepper0, 0);
 
-	char buffer[128];
+	char buffer[256];
 	for(;;)
 	{
 		command_read(buffer, sizeof (buffer));
@@ -170,14 +165,10 @@ int main(void)
 
 		switch (packet->hdr.type)
 		{
-			case COMMAND_SET_MOTOR_POS:
+			case COMMAND_READ_MOTOR_STATUS:
 			{
-				command_arg_set_motor_pos_t *command = (command_arg_set_motor_pos_t *) packet->body.payload;
-
-				// Gets the stepper pointer, and sends an error, if the motor is null
-				//  so not found
-				stepper_t *stepper = get_stepper_from_command_motor(command->motor);
-				if (stepper == NULL)
+				uint8_t i = packet->body.payload[0];
+				if (i > sizeof (motors) / sizeof (stepper_t *))
 				{
 					packet->hdr.flags.error = 1;
 					packet->body.payload[0] = COMMAND_ERROR_MOTOR_NOT_KNOWN;
@@ -186,8 +177,48 @@ int main(void)
 					break;
 				}
 
+				packet->hdr.flags.error = 0;
+				packet->body.size = 123;
+				command_response_motor_status_t *status = (command_response_motor_status_t *) packet->body.payload;
+
+				status->moving = motors[i]->stepper_moving;
+				status->enabled = motors[i]->stepper_enabled;
+				status->current_sps = motors[i]->cop.current_sps;
+				status->pos = motors[i]->position;
+
+				command_write(packet);
+				break;
+			}
+			case COMMAND_READ_INFO:
+			{
+				// Sets error to zero, and sets the new size
+				packet->hdr.flags.error = 0;
+				packet->body.size = sizeof (command_arg_info_t);
+
+				// Creates the info, and adds the motor count, and device id
+				command_arg_info_t *info = (command_arg_info_t *) packet->body.payload;
+				info->motor_count = sizeof (motors) / sizeof (stepper_t *);
+				for (uint8_t i = 0; i < 8; ++i)
+					info->device_id[i] = device_id[i];
+
+				command_write(packet);
+				break;
+			}
+			case COMMAND_SET_MOTOR_POS:
+			{
+				command_arg_set_motor_pos_t *command = (command_arg_set_motor_pos_t *) packet->body.payload;
+				if (command->motor > sizeof (motors) / sizeof (stepper_t *))
+				{
+
+					packet->hdr.flags.error = 1;
+					packet->body.payload[0] = COMMAND_ERROR_MOTOR_NOT_KNOWN;
+					packet->body.size = sizeof (command_arg_error_t);
+					command_write(packet);
+					break;
+				}
+
 				// Sets the new stepper position
-				stepper_simple_move(stepper, command->pos);
+				stepper_simple_move(motors[command->motor], command->pos);
 
 				// Sends the OK response
 				packet->hdr.flags.error = 0;
@@ -196,6 +227,13 @@ int main(void)
 
 				// Breaks from setpos
 				break;
+			}
+			default:
+			{
+				packet->hdr.flags.error = 1;
+				packet->body.payload[0] = COMMAND_ERROR_NOT_KNOWN;
+				packet->body.size = sizeof (command_arg_error_t);
+				command_write(packet);
 			}
 		}
 	}
