@@ -2,6 +2,34 @@
 #define _STM32F446_H
 
 /***********************************
+ * USART
+ ***********************************/
+
+#define USART2_BASE						0x40004400
+
+/* USART Offsets */
+
+#define USART_SR(A)						((uint32_t *) (A + 0x00))
+#define USART_DR(A)						((uint32_t *) (A + 0x04))
+#define USART_BRR(A)						((uint32_t *) (A + 0x08))
+#define USART_CR1(A)						((uint32_t *) (A + 0x0C))
+#define USART_CR2(A)						((uint32_t *) (A + 0x10))
+#define USART_CR3(A)						((uint32_t *) (A + 0x14))
+#define USART_GTPR(A)					((uint32_t *) (A + 0x18))
+
+/* USART_SR */
+
+#define USART_SR_TXE						7
+#define USART_SR_TC						6
+#define USART_SR_RXNE					5
+
+/* USART_CR1 */
+
+#define USART_CR1_RE						2
+#define USART_CR1_TE						3
+#define USART_CR1_UE						13
+
+/***********************************
  * NVIC
  ***********************************/
 
@@ -70,6 +98,7 @@ typedef struct __attribute__ (( packed ))
 #define RCC_CFGR					((uint32_t *) (RCC_BASE + 0x08))
 #define RCC_AHB1ENR				((uint32_t *) (RCC_BASE + 0x30))
 #define RCC_APB1ENR				((uint32_t *) (RCC_BASE + 0x40))
+#define RCC_APB2ENR				((uint32_t *) (RCC_BASE + 0x44))
 
 /* RCC_PLLCFGR */
 
@@ -157,6 +186,7 @@ typedef struct __attribute__ (( packed ))
 #define RCC_APB1ENR_TIM3EN		1
 #define RCC_APB1ENR_TIM2EN		0
 #define RCC_APB1ENR_PWREN		28
+#define RCC_APB1END_USART2EN		17
 
 /* RCC_AHB1ENR Bits */
 
@@ -168,6 +198,10 @@ typedef struct __attribute__ (( packed ))
 #define GPIOFEN					5
 #define GPIOGEN					6
 #define GPIOHEN					7
+
+/* RCC_APB2ENR Bits */
+
+#define RCC_APB2ENR_TIM1EN		0
 
 /***********************************
  * GPIO
@@ -200,7 +234,6 @@ typedef struct __attribute__ (( packed ))
 #define GPIO_ALTERNATIVE_FUNC	0b10
 #define GPIO_ANALOG_MODE			0b11
 #define GPIO_MODE(A, B)			(A << (2 * B))
-#define GPIO_MODE_RESET(A)		(~(0b11 << (2 * A)))
 
 /* GPIO Speeds */
 
@@ -235,7 +268,7 @@ typedef struct __attribute__ (( packed ))
 #define GPIO_AF13				0b1101
 #define GPIO_AF14				0b1110
 #define GPIO_AF15				0b1111
-#define GPIO_AF(A)				(A << (4 * B))
+#define GPIO_AF(A, B)			(A << (4 * B))
 
 /***********************************
  * Timers
@@ -304,6 +337,8 @@ typedef struct __attribute__ (( packed ))
 #define TIM_CR1_ARPE				7
 #define TIM_CR1_CEN				0
 #define TIM_CR1_UDIS				1
+#define TIM_CR1_DIR				4
+#define TIM_CR1_OPM				3
 
 /* TIM_DIER */
 

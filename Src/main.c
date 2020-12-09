@@ -16,7 +16,8 @@ static stepper_t stepper0 = {
 		.sps_inc = NEMA17_SPS_INC,
 		.timing = {
 				.presc = 90
-		}
+		},
+		.auto_enable_disable = true
 };
 
 static stepper_t stepper1 = {
@@ -31,7 +32,8 @@ static stepper_t stepper1 = {
 		.sps_inc = NEMA17_SPS_INC,
 		.timing = {
 				.presc = 90
-		}
+		},
+		.auto_enable_disable = true
 };
 
 static stepper_t stepper2 = {
@@ -106,18 +108,6 @@ void setup_clock(void)
 	    *RCC_CFGR &= ~RCC_CFGR_SW_MASK;
 	    *RCC_CFGR |= RCC_CFGR_SW(RCC_CFGR_SW_PLL_P);
 	    while ((*RCC_CFGR & RCC_CFGR_SWS_MASK) != RCC_CFGR_SWS(RCC_CFGR_SWS_PLL));
-
-	    // Sets the CLOCK Ready status LED
-	    *GPIO_ODR(STATUS_BASE) |= (1 << STATUS_CLKREADY);
-}
-
-/**
- * Initializes the GPIO for status
- */
-void status_init(void)
-{
-	*GPIO_MODER(STATUS_BASE) &= ~GPIO_MODE_RESET(STATUS_CLKREADY);
-	*GPIO_MODER(STATUS_BASE) |= GPIO_MODE(GPIO_OUTPUT, STATUS_CLKREADY);
 }
 
 /**
@@ -135,31 +125,78 @@ void steppers_init(void)
 	NVIC_ISER->iser0 |= (1 << NVIC_ISER0_TIM3) | (1 << NVIC_ISER0_TIM2);
 }
 
+stepper_t* get_stepper_from_command_motor(command_motor_t motor)
+{
+	stepper_t *stepper = NULL;
+	switch (motor)
+	{
+		case COMMAND_MOTOR0: stepper = &stepper0; break;
+		case COMMAND_MOTOR1: stepper = &stepper1; break;
+		case COMMAND_MOTOR2: stepper = &stepper2; break;
+		case COMMAND_MOTOR3: stepper = &stepper3; break;
+		default: break;
+	}
+	return stepper;
+}
+
 /**
  * Gets called by startup code
  */
 int main(void)
 {
 	// RCC: Source clock for GPIOB
-	*RCC_AHB1ENR |= (1 << GPIOBEN) | (1 << GPIOCEN);
+	*RCC_AHB1ENR |= (1 << GPIOAEN) | (1 << GPIOBEN) | (1 << GPIOCEN);
 
-	// RCC: Enable power to TIM2
+	// RCC: Enable power to TIM2, TIM3, TIM1
+	*RCC_APB2ENR |= (1 << RCC_APB2ENR_TIM1EN);
 	*RCC_APB1ENR |= (1 << RCC_APB1ENR_TIM2EN) | (1 << RCC_APB1ENR_TIM3EN);
 
 	// Performs the configuration
-	status_init();
 	setup_clock();
+	delay_init();
+	usart_init();
 	steppers_init();
 
-	// Starts moving
-	stepper_enable(&stepper0);
-	stepper_enable(&stepper1);
-
-	stepper_simple_move(&stepper0, 5000);
-	stepper_simple_move(&stepper1, 5000);
-	stepper_simple_move(&stepper0, -5000);
-	stepper_simple_move(&stepper1, -5000);
-
     /* Loop forever */
-	for(;;);
+//	stepper_simple_move(&stepper0, 100000);
+//	stepper_simple_move(&stepper0, 100000);
+//	stepper_simple_move(&stepper0, 0);
+
+	char buffer[128];
+	for(;;)
+	{
+		command_read(buffer, sizeof (buffer));
+		command_packet_t *packet = (command_packet_t *) buffer;
+
+		switch (packet->hdr.type)
+		{
+			case COMMAND_SET_MOTOR_POS:
+			{
+				command_arg_set_motor_pos_t *command = (command_arg_set_motor_pos_t *) packet->body.payload;
+
+				// Gets the stepper pointer, and sends an error, if the motor is null
+				//  so not found
+				stepper_t *stepper = get_stepper_from_command_motor(command->motor);
+				if (stepper == NULL)
+				{
+					packet->hdr.flags.error = 1;
+					packet->body.payload[0] = COMMAND_ERROR_MOTOR_NOT_KNOWN;
+					packet->body.size = sizeof (command_arg_error_t);
+					command_write(packet);
+					break;
+				}
+
+				// Sets the new stepper position
+				stepper_simple_move(stepper, command->pos);
+
+				// Sends the OK response
+				packet->hdr.flags.error = 0;
+				packet->body.size = 0;
+				command_write(packet);
+
+				// Breaks from setpos
+				break;
+			}
+		}
+	}
 }

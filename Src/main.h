@@ -5,10 +5,13 @@
 #include "stm32f446.h"
 #include "device.h"
 #include "stepper.h"
+#include "usart.h"
+#include "delay.h"
+#include "commands.h"
 
 #define NEMA17_MIN_SPS				300
-#define NEMA17_MAX_SPS				5300
-#define NEMA17_SPS_INC				6
+#define NEMA17_MAX_SPS				20000
+#define NEMA17_SPS_INC				2
 
 #endif
 

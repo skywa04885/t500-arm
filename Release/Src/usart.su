@@ -1,0 +1,7 @@
+usart.c:3:6:usart_init	0	static
+usart.c:31:6:usart_write_char	0	static
+usart.c:41:6:usart_read_char	0	static
+usart.c:49:6:usart_write_string	8	static
+usart.c:55:10:usart_read_string	16	static
+usart.c:70:5:__io_putchar	8	static
+usart.c:76:5:__io_getchar	8	static

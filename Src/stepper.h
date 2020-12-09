@@ -39,6 +39,7 @@ typedef struct {
 	/* =================== */
 	unsigned stepper_moving: 1;
 	unsigned stepper_enabled : 1;
+	unsigned auto_enable_disable : 1;
 } stepper_t;
 
 
@@ -58,6 +59,7 @@ typedef struct {
 			/* Checks if we should stop */ \
 			if (STEPPER.cop.done_steps >= STEPPER.cop.total_steps) \
 			{ \
+				if (STEPPER.auto_enable_disable) stepper_disable(&STEPPER); \
 				STEPPER.stepper_moving = false; \
 				*TIM_CR1(STEPPER.timer_base ) = 0; \
 				return; \

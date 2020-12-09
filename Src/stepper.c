@@ -13,9 +13,9 @@ void stepper_init(stepper_t *stepper)
 	 ***********************************/
 
 	// Makes all the pins input ( masks away all the ones )
-	*GPIO_MODER(stepper->gpio_base) &= GPIO_MODE_RESET(stepper->mf);
-	*GPIO_MODER(stepper->gpio_base) &= GPIO_MODE_RESET(stepper->pu);
-	*GPIO_MODER(stepper->gpio_base) &= GPIO_MODE_RESET(stepper->dir);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->mf);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->pu);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->dir);
 
 	// Makes all the pins output
 	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(GPIO_OUTPUT, stepper->mf);
@@ -121,6 +121,9 @@ void stepper_simple_move(stepper_t *stepper, int32_t new_position)
 	// Sets the done steps to zero, and the current steps per second
 	stepper->cop.done_steps = 0;
 	stepper->cop.current_sps = stepper->min_sps;
+
+	// Enables stepper
+	if (stepper->auto_enable_disable) stepper_enable(stepper);
 
 	// Configures the timer
 	*TIM_CNT(stepper->timer_base) = 0;

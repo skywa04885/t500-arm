@@ -7,10 +7,17 @@
 
 #define APB1_SPEED					45000000
 
-/* Status */
+/* A1602 */
 
-#define STATUS_BASE					GPIOC_BASE
-#define STATUS_CLKREADY				10
+#define A1602_BASE					GPIOC_BASE
+#define A1602_E						15
+#define A1602_RW						14
+#define A1602_RS						13
+#define A1602_D4						0
+#define A1602_D5						1
+#define A1602_D6						2
+#define A1602_D7						3
+#define A1602_DSHIFT					0
 
 /* Stepper0 */
 
