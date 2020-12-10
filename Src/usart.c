@@ -15,7 +15,7 @@ void usart_init(void)
 	*GPIO_OSPEEDR(GPIOA_BASE) |= GPIO_SPEED(GPIO_HIGH_SPEED, 2) | GPIO_SPEED(GPIO_HIGH_SPEED, 3);
 
 	// Sets the USART2 DIV value, to get the baud of 115200, with clock of 45Mhz
-	*USART_BRR(USART2_BASE) = ((2 * 45000000) + 115200) / (2 * 115200);
+	*USART_BRR(USART2_BASE) = ((2 * 45000000) + 576000) / (2 * 576000);
 
 
 	// Enables USART2 RX, TX and UART
@@ -40,8 +40,8 @@ void usart_write_char(char c)
 
 char usart_read_char(void)
 {
-	*GPIO_ODR(USART_TXRX_BASE) |= (1 << USART_RX_LED);
 	while (!(*USART_SR(USART2_BASE) & (1 << USART_SR_RXNE)));
+	*GPIO_ODR(USART_TXRX_BASE) |= (1 << USART_RX_LED);
 	*GPIO_ODR(USART_TXRX_BASE) &= ~(1 << USART_RX_LED);
 	return *USART_DR(USART2_BASE);
 }

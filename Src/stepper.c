@@ -72,7 +72,7 @@ void stepper_disable(stepper_t *stepper)
 void stepper_simple_move(stepper_t *stepper, int32_t new_position)
 {
 	// Waits until stepper ready for usage
-	while (stepper->stepper_moving);
+	if (stepper->stepper_moving) return;
 	stepper->stepper_moving = true;
 
 	/***********************************
