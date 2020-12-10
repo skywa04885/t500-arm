@@ -1,8 +1,0 @@
-"Src/commands.o"
-"Src/delay.o"
-"Src/main.o"
-"Src/stepper.o"
-"Src/syscalls.o"
-"Src/sysmem.o"
-"Src/usart.o"
-"Startup/startup_stm32f446retx.o"

@@ -1,5 +1,0 @@
-main.c:74:1:TIM2_IRQHandler	8	static
-main.c:75:1:TIM3_IRQHandler	8	static
-main.c:84:6:setup_clock	12	static
-main.c:125:6:steppers_init	8	static
-main.c:140:5:main	272	static

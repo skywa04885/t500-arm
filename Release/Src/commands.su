@@ -1,4 +1,0 @@
-commands.c:3:6:command_write_byte	8	static
-commands.c:9:9:command_read_byte	8	static
-commands.c:26:6:command_read	16	static
-commands.c:43:6:command_write	16	static
