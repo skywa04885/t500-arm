@@ -202,6 +202,7 @@ typedef struct __attribute__ (( packed ))
 /* RCC_APB2ENR Bits */
 
 #define RCC_APB2ENR_TIM1EN		0
+#define RCC_APB2ENR_TIM8EN		1
 
 /***********************************
  * GPIO
@@ -329,6 +330,7 @@ typedef struct __attribute__ (( packed ))
 
 /* TIM_SR */
 
+#define TIM_SR_CC1IF				1
 #define TIM_SR_UIF				0
 
 /* TIM_CCMR1 */
@@ -348,6 +350,12 @@ typedef struct __attribute__ (( packed ))
 
 #define TIM_CCMR1_CC1S(A)		(A << 0)
 #define TIM_CCMR1_CC2S(A)		(A << 8)
+
+#define TIM_CCMR1_CC1S_OUTPUT	0b00
+#define TIM_CCMR1_CC1S_TI1		0b01
+#define TIM_CCMR1_CC1S_TI2		0b10
+
+#define TIM_CCMR1_IC1F(A)		(A << 0)
 
 /* TIM1_CR1 */
 

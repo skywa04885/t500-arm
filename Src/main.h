@@ -8,7 +8,6 @@
 #include "usart.h"
 #include "delay.h"
 #include "commands.h"
-#include "tsc3200.h"
 
 #define NEMA17_MIN_SPS				300
 #define NEMA17_MAX_SPS				12000

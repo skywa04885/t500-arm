@@ -4,12 +4,6 @@
  * Global variables
  ***********************************/
 
-static tsc3200_t csensor0 = {
-		.gpio_base = GPIOA_BASE, .timer_base = TIM1_BASE,
-		.gpio_s3 = 13, .gpio_s2 = 14, .gpio_s1 = 5, .gpio_s0 = 6,
-		.gpio_oe = 7, .gpio_out = 8
-};
-
 static stepper_t stepper0 = {
 		.mf = STEPPER0_MF,
 		.pu = STEPPER0_PU,
@@ -79,6 +73,7 @@ static stepper_t *motors[] = {
 
 STEPPER_ISR(TIM2_IRQHandler, stepper0);
 STEPPER_ISR(TIM3_IRQHandler, stepper1);
+STEPPER_ISR(TIM4_IRQHandler, stepper1);
 
 /***********************************
  * Functions
@@ -152,26 +147,18 @@ int main(void)
 	*RCC_AHB1ENR |= (1 << GPIOAEN) | (1 << GPIOBEN) | (1 << GPIOCEN);
 
 	// RCC: Enable power to TIM2, TIM3, TIM1
-	*RCC_APB2ENR |= (1 << RCC_APB2ENR_TIM1EN);
+	*RCC_APB2ENR |= (1 << RCC_APB2ENR_TIM1EN) | (1 << RCC_APB2ENR_TIM8EN);
 	*RCC_APB1ENR |= (1 << RCC_APB1ENR_TIM2EN) | (1 << RCC_APB1ENR_TIM3EN) | (1 << RCC_APB1ENR_TIM4EN);
 
 	// Performs the configuration
 	setup_clock();
 	delay_init();
 	usart_init();
-	steppers_init();
-	tsc3200_init(&csensor0);
+//	steppers_init();
 
-	for (;;)
-	{
-		tsc3200_ret_t res = tsc3200_read(&csensor0);
-		printf("R: %u, G: %u, B: %u, A: %u\r\n", res.r, res.g, res.b, res.a);
-	}
+	for (;;);
 
     /* Loop forever */
-	stepper_simple_move(&stepper2, 100000);
-	stepper_simple_move(&stepper0, 0);
-
 	char buffer[256];
 	for(;;)
 	{
