@@ -8,6 +8,8 @@
 #include "usart.h"
 #include "delay.h"
 #include "commands.h"
+#include "spi.h"
+#include "Drivers/Ethernet/ENC28J60.h"
 
 #define NEMA17_MIN_SPS				300
 #define NEMA17_MAX_SPS				12000

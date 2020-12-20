@@ -9,7 +9,77 @@
 #define _ENC28J60_H
 
 #include "../../include.h"
+#include "../../spi.h"
+#include "../../delay.h"
 #include "../../stm32f446.h"
+
+/****************************************************
+ * SPI
+ ****************************************************/
+
+/* Commands */
+
+typedef enum __attribute__ (( packed ))
+{
+	ENC28J60_OPCODE_RCR = 0b000,		/* Read Control Register */
+	ENC28J60_OPCODE_RBM,				/* Read Buffer Memory */
+	ENC28J60_OPCODE_WCR,				/* Write Control Register */
+	ENC28J60_OPCODE_WBM,				/* Write Buffer Memory */
+	ENC28J60_OPCODE_BFS,				/* Bit Field Set */
+	ENC28J60_OPCODE_BFC,				/* Bit Field Clear */
+	ENC28J60_OPCODE_SRC = 0b111			/* System Reset Command */
+} enc28j60_spi_opcode_t;
+
+/****************************************************
+ * PHY Registers
+ ****************************************************/
+
+#define ENC28J60_PHY_PHCON1				0x00
+#define ENC28J60_PHY_PHSTAT1				0x01
+#define ENC28J60_PHY_PHID1				0x02
+#define ENC28J60_PHY_PHID2				0x03
+#define ENC28J60_PHY_PHCON2				0x10
+#define ENC28J60_PHY_PHSTAT2				0x11
+#define ENC28J60_PHY_PHIE				0x12
+#define ENC28J60_PHY_PHIR				0x13
+#define ENC28J60_PHY_PHLCON				0x14
+
+/* PHLCON */
+
+typedef enum __attribute__ (( packed )) {
+	ENC28J60_PHLCON_LACFG_RESERVED1	= 0b0000,
+	ENC28J60_PHLCON_LACFG_DISPLAY_TRANSMIT_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_DISPLAY_RECEIVE_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_DISPLAY_COLLISION_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS,
+	ENC28J60_PHLCON_LACFG_DISPLAY_DUPLEX_STATUS,
+	ENC28J60_PHLCON_LACFG_RESERVED2,
+	ENC28J60_PHLCON_LACFG_DISPLAY_TRANSMIT_AND_RECEIVE_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_ON,
+	ENC28J60_PHLCON_LACFG_OFF,
+	ENC28J60_PHLCON_LACFG_BLINK_FAST,
+	ENC28J60_PHLCON_LACFG_BLINK_SLOW,
+	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS_AND_RECEIVE_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS_AND_RXTX_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_DISPLAY_DUPLEX_STATUS_AND_COLLISION_ACTIVITY,
+	ENC28J60_PHLCON_LACFG_RESERVED3
+} enc28j60_phlcon_lxcfg_t;
+
+typedef enum __attribute__ (( packed )) {
+	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_NS,
+	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_MS,
+	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_LS,
+	ENC28J60_PHLCON_RESERVED
+} enc28j60_phlcon_lfrq_t;
+
+typedef struct __attribute__ (( packed )) {
+	unsigned reserved2	: 1;
+	unsigned strch		: 1;	/* LED Pulse Stretching Enable Bit */
+	unsigned lfrq		: 2;	/* LED Pulse Stretch Time Configuration Bits */
+	unsigned lbcfg		: 4;	/* LEDB Configuration Bits */
+	unsigned lacfg		: 4;	/* LEDA Configuration Bits */
+	unsigned reserved1	: 4;
+} enc28j60_phlcon_t;
 
 /****************************************************
  * Memory Mapping
@@ -43,12 +113,6 @@
 #define ENC28J60_MEM_BK0_EDMACSL			0x16
 #define ENC28J60_MEM_BK0_EDMACSH			0x17
 
-#define ENC28J60_MEM_BK0_EIE				0x1B
-#define ENC28J60_MEM_BK0_EIR				0x1C
-#define ENC28J60_MEM_BK0_ESTAT			0x1D
-#define ENC28J60_MEM_BK0_ECON2			0x1E
-#define ENC28J60_MEM_BK0_ECON1			0x1F
-
 /* Bank 1 */
 
 #define ENC28J60_MEM_BK1_EHT0			0x00
@@ -75,11 +139,6 @@
 #define ENC28J60_MEM_BK1_EPMOH			0x15
 #define ENC28J60_MEM_BK1_ERXFCON			0x18
 #define ENC28J60_MEM_BK1_EPKTCNT			0x19
-#define ENC28J60_MEM_BK1_EIE				0x1B
-#define ENC28J60_MEM_BK1_EIR				0x1C
-#define ENC28J60_MEM_BK1_ESTAT			0x1D
-#define ENC28J60_MEM_BK1_ECON2			0x1E
-#define ENC28J60_MEM_BK1_ECON1			0x1F
 
 /* Bank 2 */
 
@@ -128,49 +187,71 @@
 #define ENC28J60_MEM_BK3_EPAUSL			0x18
 #define ENC28J60_MEM_BK3_EPAUSH			0x19
 
-#define ENC28J60_MEM_BK3_EIE				0x1B
-#define ENC28J60_MEM_BK3_EIR				0x1C
-#define ENC28J60_MEM_BK3_ESTAT			0x1D
-#define ENC28J60_MEM_BK3_ECON2			0x1E
-#define ENC28J60_MEM_BK3_ECON1			0x1F
+/* Bank X */
+
+#define ENC28J60_MEM_BKX_EIE				0x1B
+#define ENC28J60_MEM_BKX_EIR				0x1C
+#define ENC28J60_MEM_BKX_ESTAT			0x1D
+#define ENC28J60_MEM_BKX_ECON2			0x1E
+#define ENC28J60_MEM_BKX_ECON1			0x1F
 
 /****************************************************
  * Registers Descriptions
  ****************************************************/
 
+/* MISTAT */
+
+typedef struct __attribute__ (( packed ))
+{
+	unsigned busy		: 1;
+	unsigned scan		: 1;
+	unsigned invalid	: 1;
+	unsigned r			: 1;
+	unsigned unused		: 4;
+} enc28j60_mistat_t;
+
+/* MICMD */
+
+typedef struct __attribute__ (( packed ))
+{
+	unsigned miird		: 1;
+	unsigned miiscan	: 1;
+	unsigned unused		: 6;
+} enc28j60_micmd_t;
+
 /* ECON1 */
 
-typedef enum {
+typedef enum __attribute__ (( packed )) {
 	ENC28J60_BANK0 = 0b00,
 	ENC28J60_BANK1,
 	ENC28J60_BANK2,
 	ENC28J60_BANK3
 } enc28j60_econ1_bsel_t;
 
-typedef struct {
-	unsigned txrst		: 1;	/* Transmit Logic Reset bit */
-	unsigned rxrst		: 1;	/* Receive Logic Reset bit */
-	unsigned dmast		: 1;	/* DMA Start and Busy Status bit */
-	unsigned csumen		: 1;	/* DMA Checksum Enable bit */
-	unsigned txrts		: 1;	/* Transmit Request to Send bit */
-	unsigned rxen		: 1;	/* Receive Enable bit */
+typedef struct __attribute__ (( packed )) {
 	unsigned bsel		: 2;	/* Bank Select bits */
+	unsigned rxen		: 1;	/* Receive Enable bit */
+	unsigned txrts		: 1;	/* Transmit Request to Send bit */
+	unsigned csumen		: 1;	/* DMA Checksum Enable bit */
+	unsigned dmast		: 1;	/* DMA Start and Busy Status bit */
+	unsigned rxrst		: 1;	/* Receive Logic Reset bit */
+	unsigned txrst		: 1;	/* Transmit Logic Reset bit */
 } enc28j60_econ1_t;
 
 /* ECON2 */
 
-typedef struct {
-	unsigned autoinc	: 1;	/* Automatic Buffer Pointer Increment Enable bit */
-	unsigned pktdec		: 1;	/* Packet Decrement bit */
-	unsigned pwrsv		: 1;	/* Power Save Enable bit */
-	unsigned reserved1	: 1;	/* Always Zero */
-	unsigned vrps		: 1;	/* Voltage Regulator Power Save Enable bit */
+typedef struct __attribute__ (( packed )) {
 	unsigned reserved2	: 3;	/* Always Zero */
+	unsigned vrps		: 1;	/* Voltage Regulator Power Save Enable bit */
+	unsigned reserved1	: 1;	/* Always Zero */
+	unsigned pwrsv		: 1;	/* Power Save Enable bit */
+	unsigned pktdec		: 1;	/* Packet Decrement bit */
+	unsigned autoinc	: 1;	/* Automatic Buffer Pointer Increment Enable bit */
 } enc28j60_econ2_t;
 
 /* ECOCON */
 
-typedef enum {
+typedef enum __attribute__ (( packed )) {
 	/* 25Mhz 	*/ ENC28J60_ECOCON_COCON_CLKDIV1 = 0b001,
 	/* 12.5Mhz 	*/ ENC28J60_ECOCON_COCON_CLKDIV2,
 	/* 8.33Mhz 	*/ ENC28J60_ECOCON_COCON_CLKDIV3,
@@ -178,47 +259,23 @@ typedef enum {
 	/* 3.125Mhz */ ENC28J60_ECOCON_COCON_CLKDIV8 = 0b101
 } enc28j60_ecocon_cocon_t;
 
-typedef struct {
+typedef struct __attribute__ (( packed )) {
 	unsigned reserved 	: 5;
 	unsigned cocon		: 3;
 } enc28j60_ecocon_t;
 
-/* PHLCON */
+/* ESTAT */
 
-typedef enum {
-	ENC28J60_PHLCON_LACFG_RESERVED1	= 0b0000,
-	ENC28J60_PHLCON_LACFG_DISPLAY_TRANSMIT_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_DISPLAY_RECEIVE_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_DISPLAY_COLLISION_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS,
-	ENC28J60_PHLCON_LACFG_DISPLAY_DUPLEX_STATUS,
-	ENC28J60_PHLCON_LACFG_RESERVED2,
-	ENC28J60_PHLCON_LACFG_DISPLAY_TRANSMIT_AND_RECEIVE_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_ON,
-	ENC28J60_PHLCON_LACFG_OFF,
-	ENC28J60_PHLCON_LACFG_BLINK_FAST,
-	ENC28J60_PHLCON_LACFG_BLINK_SLOW,
-	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS_AND_RECEIVE_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_DISPLAY_LINK_STATUS_AND_RXTX_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_DISPLAY_DUPLEX_STATUS_AND_COLLISION_ACTIVITY,
-	ENC28J60_PHLCON_LACFG_RESERVED3
-} enc28j60_phlcon_lxcfg_t;
-
-typedef enum {
-	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_NS,
-	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_MS,
-	ENC28J60_PHLCON_LFRQ_STRETCH_LED_EVENTS_BY_LS,
-	ENC28J60_PHLCON_RESERVED
-} enc28j60_phlcon_lfrq_t;
-
-typedef struct {
-	unsigned reserved1	: 4;
-	unsigned lacfg		: 4;	/* LEDA Configuration Bits */
-	unsigned lbcfg		: 4;	/* LEDB Configuration Bits */
-	unsigned lfrq		: 2;	/* LED Pulse Stretch Time Configuration Bits */
-	unsigned strch		: 1;	/* LED Pulse Stretching Enable Bit */
-	unsigned reserved2	: 1;
-} enc28j60_phlcon_t;
+typedef struct __attribute__ (( packed )) {
+	unsigned clkrdy		: 1;
+	unsigned txabrt		: 1;
+	unsigned rxbusy		: 1;
+	unsigned nunused	: 1;
+	unsigned latecol	: 1;
+	unsigned reserved	: 1;
+	unsigned buffer		: 1;
+	unsigned int_		: 1;
+} enc28j60_estat_t;
 
 /****************************************************
  * Types
@@ -229,13 +286,33 @@ typedef struct {
 	uint32_t gpio_base;
 	uint32_t gpio_cs;
 	/* Device Addresses */
-	uint8_t mac_addr[4];
+	uint8_t mac_addr[6];
 	uint8_t ipv4_addr[4];
 } enc28j60_config_t;
 
 /****************************************************
  * Prototypes
  ****************************************************/
+
+/**
+ * Selects the device
+ */
+void enc28j60_select(enc28j60_config_t *cfg);
+
+/**
+ * Deslects the device
+ */
+void enc28j60_deselect(enc28j60_config_t *cfg);
+
+/**
+ * Writes an command to the ENC28J60
+ */
+void enc28j60_write_cmd(enc28j60_config_t *cfg, uint8_t opcode, uint8_t arg);
+
+/**
+ * Selects the memory bank of the ENC28J60
+ */
+void enc28j60_bank_select(enc28j60_config_t *cfg, enc28j60_econ1_bsel_t bank);
 
 /**
  * Initializes the ENC28J60 Peripheral
@@ -247,5 +324,30 @@ void enc28j60_init(enc28j60_config_t *cfg);
  *  that the oscillator is stable
  */
 void enc28j60_await_clkrdy(enc28j60_config_t *cfg);
+
+/**
+ * Waits for the busy flag to be cleared in the MISTAT register
+ */
+void enc28j60_mistat_wait_busy(enc28j60_config_t *cfg);
+
+/**
+ * Writes to an PHY register
+ */
+void enc28j60_phy_write(enc28j60_config_t *cfg, uint8_t address, uint16_t halfword);
+
+/**
+ * Reads the value from an PHY register
+ */
+uint16_t enc28j60_phy_read(enc28j60_config_t *cfg, uint8_t address);
+
+/**
+ * Sets the device MAC
+ */
+void enc28j60_set_mac(enc28j60_config_t *cfg, uint8_t *mac);
+
+/**
+ * Gets the device MAc
+ */
+void enc28j60_get_mac(enc28j60_config_t *cfg, uint8_t *mac);
 
 #endif

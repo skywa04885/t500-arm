@@ -4,6 +4,12 @@
  * Global variables
  ***********************************/
 
+static enc28j60_config_t ethernet = {
+		.gpio_base = GPIOA_BASE,
+		.gpio_cs = 4,
+		.mac_addr = { 0x40, 0x14, 0x44, 0x12, 0x24, 0x12 }
+};
+
 static stepper_t stepper0 = {
 		.mf = STEPPER0_MF,
 		.pu = STEPPER0_PU,
@@ -154,7 +160,16 @@ int main(void)
 	setup_clock();
 	delay_init();
 	usart_init();
+	spi_init();
 //	steppers_init();
+
+	enc28j60_init(&ethernet);
+
+	// Prints the MAC address
+	uint8_t mac[6];
+	enc28j60_get_mac(&ethernet, mac);
+	printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
 
 	for (;;);
 

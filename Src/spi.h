@@ -10,18 +10,8 @@
 void spi_init(void);
 
 /**
- * Writes an byte over the SPI bus
+ * Reads and writes byte over SPI
  */
-void spi_write_byte(uint8_t byte);
-
-/**
- * Writes an half word over the SPI bus
- */
-void spi_write_halfword(uint16_t halfword);
-
-/**
- * Writes an word over the SPI bus
- */
-void spi_write_word(uint32_t word);
+uint8_t spi_transceive(uint8_t byte);
 
 #endif
