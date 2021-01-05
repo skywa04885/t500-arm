@@ -13,19 +13,19 @@ void stepper_init(stepper_t *stepper)
 	 ***********************************/
 
 	// Makes all the pins input ( masks away all the ones )
-	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->mf);
-	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->pu);
-	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(0b11, stepper->dir);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(stepper->mf, 0b11);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(stepper->pu, 0b11);
+	*GPIO_MODER(stepper->gpio_base) &= ~GPIO_MODE(stepper->dir, 0b11);
 
 	// Makes all the pins output
-	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(GPIO_OUTPUT, stepper->mf);
-	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(GPIO_OUTPUT, stepper->pu);
-	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(GPIO_OUTPUT, stepper->dir);
+	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(stepper->mf, GPIO_MODE_OUTPUT);
+	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(stepper->pu, GPIO_MODE_OUTPUT);
+	*GPIO_MODER(stepper->gpio_base) |= GPIO_MODE(stepper->dir, GPIO_MODE_OUTPUT);
 
 	// Pull down
-	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PULL(GPIO_PULL_DOWN,  stepper->mf);
-	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PULL(GPIO_PULL_DOWN,  stepper->dir);
-	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PULL(GPIO_PULL_DOWN,  stepper->pu);
+	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PUPD(stepper->mf, GPIO_PUPD_PULL_DOWN);
+	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PUPD(stepper->dir, GPIO_PUPD_PULL_DOWN);
+	*GPIO_PUPDR(stepper->gpio_base) |= GPIO_PUPD(stepper->pu, GPIO_PUPD_PULL_DOWN);
 
 	// Sets the default values ( disabled, no pulse, move forward )
 	*GPIO_ODR(stepper->gpio_base) &= ~(1 << stepper->mf);
@@ -33,7 +33,7 @@ void stepper_init(stepper_t *stepper)
 	*GPIO_ODR(stepper->gpio_base) |= (1 << stepper->dir);
 
 	// Makes PU high speed
-	*GPIO_OSPEEDR(stepper->gpio_base) |= GPIO_SPEED(GPIO_HIGH_SPEED, stepper->pu);
+	*GPIO_OSPEEDR(stepper->gpio_base) |= GPIO_OSPEED(stepper->pu, GPIO_HIGH_SPEED);
 
 	/***********************************
 	 * Timer

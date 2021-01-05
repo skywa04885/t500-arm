@@ -10,6 +10,4 @@
 #include <sys/time.h>
 #include <sys/times.h>
 
-#include "usart.h"
-
 #endif

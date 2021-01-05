@@ -4,6 +4,7 @@
 #include "include.h"
 #include "stm32f446.h"
 #include "device.h"
+#include "hardware/gpio.h"
 
 /***********************************
  * Types
