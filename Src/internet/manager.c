@@ -39,10 +39,106 @@ void manager_handle_control_packet(enc28j60_pkt_t *pkt)
 	//  call, and what response to send.
 	switch (control_pkt->opcode)
 	{
+		case CONTROL_PKT_OP_STEPPER_STATUS:
+		{
+			//
+			// Parses the arguments
+			//
+
+			u8 motor = 0;
+
+			// Parses the arguments
+			control_pkt_arg_t *arg = (control_pkt_arg_t *) control_pkt->payload;
+			do
+			{
+				if (arg->t == CONTROL_PKT_ARG_TYPE_U8)
+					motor = ((control_pkt_arg_u8_t *) arg->payload)->val;
+			} while ((arg = control_pkt_arg_parse_next(arg)) != NULL);
+
+			// Checks if the motor number is actually available
+			if (motor >= stepper_motors_count) return;
+
+			//
+			// Builds the status
+			//
+
+			stepper_t *stepper = stepper_motors[motor];
+
+			u8 flags = 0x00;
+			if (stepper->stepper_enabled)
+				flags |= (_BV(CONTROL_PKT_ARG_MOTOR_FLAG_ENABLED));
+			if (stepper->stepper_moving)
+				flags |= (_BV(CONTROL_PKT_ARG_MOTOR_FLAG_MOVING));
+
+			control_pkt_arg_stepper_status_t status = {
+					.id = motor,
+					.flags = flags,
+					.sps = stepper->cop.current_sps,
+					.cpos = stepper->position,
+					.tpos = stepper->cop.target_pos,
+			};
+
+			//
+			// Sends the status
+			//
+
+			// Builds the response packet
+			memset(write_buffer, 0, 1000);
+			enc28j60_pkt_t *resp_pkt = (enc28j60_pkt_t *) write_buffer;
+			ip_pkt_t *resp_ip_pkt = (ip_pkt_t *) resp_pkt->eth_pkt.payload;
+			control_pkt_t *resp_control_pkt = pkt_builder_control_reply((u8 *) &resp_pkt->eth_pkt, pkt->eth_pkt.hdr.sa, ip_ipv4->sa, 60, CONTROL_PKT_OP_STEPPER_STATUS, control_pkt->sn);
+			control_pkt_arg_t *resp_arg = (control_pkt_arg_t *) resp_control_pkt->payload;
+
+			// Builds the arguments
+			u16 resp_payload_size = 0;
+
+			resp_arg = control_pkt_arg_add_stepper_status(resp_arg, &status);
+			resp_payload_size += sizeof (control_pkt_arg_t) + sizeof (control_pkt_arg_stepper_status_t);
+
+			resp_arg = control_pkt_arg_end(resp_arg);
+			resp_payload_size += sizeof (control_pkt_arg_t);
+
+			// Finishes and writes the response packet
+			pkt_builder_control_reply_finish(resp_ip_pkt, resp_payload_size);
+			enc28j60_write(resp_pkt, BSWAP16(resp_ip_pkt->hdr.tl));
+
+			break;
+		}
+		case CONTROL_PKT_OP_STEPPER_DISABLE:
+		case CONTROL_PKT_OP_STEPPER_ENABLE:
+		{
+			//
+			// Parses the arguments
+			//
+
+			u8 motor = 0;
+
+			// Parses the arguments
+			control_pkt_arg_t *arg = (control_pkt_arg_t *) control_pkt->payload;
+			do
+			{
+				if (arg->t == CONTROL_PKT_ARG_TYPE_U8)
+					motor = ((control_pkt_arg_u8_t *) arg->payload)->val;
+			} while ((arg = control_pkt_arg_parse_next(arg)) != NULL);
+
+			// Checks if the motor number is actually available
+			if (motor >= stepper_motors_count) return;
+
+			//
+			// Enables / Disables the stepper the stepper
+			//
+
+			if (control_pkt->opcode == CONTROL_PKT_OP_STEPPER_DISABLE)
+				stepper_disable(stepper_motors[motor]);
+			else
+				stepper_enable(stepper_motors[motor]);
+
+			break;
+		}
 		case CONTROL_PKT_OP_STEPPER_MOVE_TO:
 		{
 			//
-			// Moves the stepper
+			// Parses the arguments
 			//
 
 			u8 motor = 0;
@@ -68,11 +164,12 @@ void manager_handle_control_packet(enc28j60_pkt_t *pkt)
 			// Checks if the motor number is actually available
 			if (motor >= stepper_motors_count) return;
 
+			//
+			// Moves the stepper
+			//
+
 			// Moves the motor
 			stepper_simple_move(stepper_motors[motor], pos);
-
-			printf("M %u, To %d\n", motor, (int) pos);
-
 
 			break;
 		}
@@ -100,7 +197,7 @@ void manager_handle_control_packet(enc28j60_pkt_t *pkt)
 				control_pkt_arg_motor_t motor_arg = {
 						.id = i,
 						.t = CONTROL_PKT_MOTOR_TYPE_STEPPER,
-						.m = CONTROL_PKT_MOTOR_MODE_AUTO,
+						.m = (motor->auto_enable_disable ==true ? CONTROL_PKT_MOTOR_MODE_AUTO : CONTROL_PKT_MOTOR_MODE_MANUAL),
 						.mnsps = motor->min_sps,
 						.mxsps = motor->max_sps
 				};
@@ -161,7 +258,8 @@ extern void udp_packet_callback(enc28j60_pkt_t *pkt)
 		case CONTROL_PORT:
 		{
 			control_pkt_t *control_pkt = (control_pkt_t *) udp_pkt->payload;
-			if (control_pkt->type != CONTROL_PKT_TYPE_REQUEST) return;
+			if (!control_pkt_check_prefix(control_pkt)) return;
+			else if (control_pkt->type != CONTROL_PKT_TYPE_REQUEST) return;
 			manager_handle_control_packet(pkt);
 		}
 		default: break;

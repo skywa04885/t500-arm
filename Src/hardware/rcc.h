@@ -73,9 +73,11 @@
 
 #define RCC_APB2ENR_SPI1EN				12
 #define RCC_APB2ENR_TIM11EN				18
+#define RCC_APB2ENR_TIM10EN				17
 
 #define RCC_APB1ENR_USART2EN			17
 #define RCC_APB1ENR_TIM2EN				0
 #define RCC_APB1ENR_TIM3EN				1
+#define RCC_APB1ENR_TIM4EN				2
 
 #endif

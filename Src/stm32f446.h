@@ -80,6 +80,10 @@ typedef struct __attribute__ (( packed ))
 #define TIM_DCR(A)				((uint16_t *) (A + 0x48))
 #define TIM_DMAR(A)				((uint16_t *) (A + 0x4C))
 
+/* TIM_EGR */
+#define TIM_EGR_UG				0
+#define TIM_EGR_CC1G			1
+
 /* TIM_SMCR */
 #define TIM_SMCR_SMS(A)			(A << 0)
 #define TIM_SMCR_SMS_RESET_MODE	0b100
@@ -89,10 +93,9 @@ typedef struct __attribute__ (( packed ))
 
 /* TIM_CCER */
 
-#define TIM_CCER_CC2P			5
-#define TIM_CCER_CC2NP			7
+#define TIM_CCER_CC1NP			3
+#define TIM_CCER_CC1P			1
 #define TIM_CCER_CC1E			0
-#define TIM_CCER_CC2E			4
 
 /* TIM_SR */
 
@@ -111,8 +114,6 @@ typedef struct __attribute__ (( packed ))
 
 #define TIM_CCMR1_OC1M(A)		(A << 4)
 #define TIM_CCMR1_OC1M_MASK		TIM_CCMR1_OC1M(0b111)
-#define TIM_CCMR1_OC1M_FROZEN	0b000
-#define TIM_CCMR1_OC1M_ACTIVE	0b101
 
 #define TIM_CCMR1_CC1S(A)		(A << 0)
 #define TIM_CCMR1_CC2S(A)		(A << 8)

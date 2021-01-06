@@ -13,6 +13,10 @@
 #define NEMA23_MAX_SPS				8000
 #define NEMA23_SPS_INC				4
 
+#define NEMA23_FAST_MIN_SPS			300
+#define NEMA23_FAST_MAX_SPS			20000
+#define NEMA23_FAST_SPS_INC			4
+
 /* Timing */
 
 #define APB1_SPEED					45000000

@@ -6,6 +6,7 @@
  *********************************************/
 
 #include <string.h>
+#include <stdbool.h>
 
 /*********************************************
  * C Standard Library
@@ -17,7 +18,7 @@
  * Macros
  *********************************************/
 
-#define CONTROL_PORT						7513
+#define CONTROL_PORT						7588
 
 #define CONTROL_PACKET_FLAG_ERR				0
 #define CONTROL_PACKET_FLAG_OK				1
@@ -48,7 +49,10 @@ typedef enum
 typedef enum
 {
 	CONTROL_PKT_OP_MOTOR_INFO = 0,
-	CONTROL_PKT_OP_STEPPER_MOVE_TO = 1
+	CONTROL_PKT_OP_STEPPER_MOVE_TO = 1,
+	CONTROL_PKT_OP_STEPPER_ENABLE = 2,
+	CONTROL_PKT_OP_STEPPER_DISABLE = 3,
+	CONTROL_PKT_OP_STEPPER_STATUS = 4
 } control_pkt_opcode_t;
 
 typedef enum
@@ -122,6 +126,9 @@ typedef struct __attribute__ (( packed ))
 
 /* Custom Datatypes */
 
+#define CONTROL_PKT_ARG_MOTOR_FLAG_ENABLED			0
+#define CONTROL_PKT_ARG_MOTOR_FLAG_MOVING			1
+
 typedef struct __attribute__ (( packed ))
 {
 	u8			id;					/* The Motor ID (0-255) */
@@ -140,7 +147,7 @@ typedef struct __attribute__ (( packed ))
 	i32			cpos;				/* Current Position */
 	i32			tpos;				/* Target Position */
 	u8			next[0];
-} control_pkt_arg_motor_status_t;
+} control_pkt_arg_stepper_status_t;
 
 /* Packet itsef */
 
@@ -153,6 +160,7 @@ typedef struct __attribute__ (( packed ))
 
 typedef struct __attribute__ (( packed ))
 {
+	char		prefix[10];			/* Packet-Prefix */
 	unsigned 	type 		: 1;	/* Packet Type, request (0), reply (1) */
 	unsigned 	opcode 		: 7;	/* Operation Code */
 	u8			f;					/* Flags */
@@ -165,7 +173,11 @@ typedef struct __attribute__ (( packed ))
  * Prototypes
  *********************************************/
 
+void control_pkt_add_prefix(control_pkt_t *pkt);
+bool control_pkt_check_prefix(control_pkt_t *pkt);
+
 control_pkt_arg_t *control_pkt_arg_add_motor(control_pkt_arg_t *arg, control_pkt_arg_motor_t *motor);
+control_pkt_arg_t *control_pkt_arg_add_stepper_status(control_pkt_arg_t *arg, control_pkt_arg_stepper_status_t *status);
 control_pkt_arg_t *control_pkt_arg_end(control_pkt_arg_t *arg);
 
 control_pkt_arg_t *control_pkt_arg_parse_next(control_pkt_arg_t *arg);

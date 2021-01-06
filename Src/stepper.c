@@ -74,6 +74,7 @@ void stepper_simple_move(stepper_t *stepper, int32_t new_position)
 	// Waits until stepper ready for usage
 	if (stepper->stepper_moving) return;
 	stepper->stepper_moving = true;
+	stepper->cop.target_pos = new_position;
 
 	/***********************************
 	 * Performs position calculations

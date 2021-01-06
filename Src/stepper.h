@@ -5,6 +5,7 @@
 #include "stm32f446.h"
 #include "device.h"
 #include "hardware/gpio.h"
+#include "types.h"
 
 /***********************************
  * Types
@@ -22,6 +23,7 @@ typedef struct {
 typedef struct {
 	uint32_t stop_speedup_at, start_slowdown_at;
 	uint32_t total_steps, done_steps;
+	i32 	target_pos;
 	uint16_t current_sps;
 } stepper_operation_t;
 

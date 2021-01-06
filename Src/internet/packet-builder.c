@@ -110,6 +110,7 @@ control_pkt_t *pkt_builder_control_reply(u8 *buffer, u8 *ha, u8 *dest4, u8 ttl, 
 {
 	udp_pkt_t *udp_pkt = pkt_builder_udp(buffer, ha, dest4, ttl, CONTROL_PORT);
 	control_pkt_t *control_pkt = (control_pkt_t *) udp_pkt->payload;
+	control_pkt_add_prefix(control_pkt);
 
 	control_pkt->sn = sn;
 	control_pkt->f = BSWAP16(0x00);
