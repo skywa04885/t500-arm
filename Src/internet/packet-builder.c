@@ -71,9 +71,9 @@ dns_pkt_t *pkt_builder_dns(u8 *buffer, u8 *ha, u8 *dest4, u8 ttl, u16 id)
 	return dns_pkt;
 }
 
-arp_pkt_t *pkt_builder_arp(u8 *buffer, u8 *ha, u8 *tha, u8 *tpa, u8 ttl, u16 op)
+arp_pkt_t *pkt_builder_arp(u8 *buffer, u8 *tha, u8 *tpa, u8 ttl, u16 op)
 {
-	ethernet_pkt_t *eth_pkt = pkt_builder_ethernet(buffer, ha, ETHERNET_PKT_TYPE_ARP);
+	ethernet_pkt_t *eth_pkt = pkt_builder_ethernet(buffer, tha, ETHERNET_PKT_TYPE_ARP);
 	arp_pkt_t *arp_pkt = (arp_pkt_t *) eth_pkt->payload;
 	arp_payload_ipv4_t *arp_ipv4 = (arp_payload_ipv4_t *) arp_pkt->payload;
 
@@ -118,6 +118,30 @@ control_pkt_t *pkt_builder_control_reply(u8 *buffer, u8 *ha, u8 *dest4, u8 ttl, 
 	control_pkt->opcode = op;
 
 	return control_pkt;
+}
+
+icmp_pkt_t *pkt_builder_icmp(u8 *buffer, u8 *ha, u8 *dest4, u8 ttl, u8 type, u8 code)
+{
+	ip_pkt_t *ip_pkt = pkt_builder_ip(buffer, ha, dest4, ttl, IP_HDR_PROTO_ICMP);
+	ip_ipv4_body_t *ipv4_body = (ip_ipv4_body_t *) ip_pkt->payload;
+	icmp_pkt_t *icmp_pkt = (icmp_pkt_t *) ipv4_body->payload;
+
+	icmp_pkt->hdr.type = type;
+	icmp_pkt->hdr.code = code;
+
+	return icmp_pkt;
+}
+
+void pkt_builder_icmp_finish(ip_pkt_t *ip_pkt)
+{
+	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
+	icmp_pkt_t *icmp_pkt = (icmp_pkt_t *) ip_ipv4->payload;
+
+	pkt_builder_ip_finish(ip_pkt);
+
+	icmp_pkt->hdr.cs = 0;
+	icmp_pkt->hdr.cs = icmp_calc_cs(icmp_pkt,
+			BSWAP16(ip_pkt->hdr.tl) - (ip_pkt->hdr.ihl * 4));
 }
 
 void pkt_builder_control_reply_finish(ip_pkt_t *ip_pkt, u16 ps)

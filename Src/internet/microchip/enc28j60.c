@@ -1,6 +1,11 @@
-#include "enc28j60.h"
+/*
+	STM32 ProjectA source code, made by Skywa04885... All Rights Reserved !
 
-extern void udp_packet_callback(enc28j60_pkt_t *pkt);
+	contact: sw04885@fannst.nl
+*/
+
+#include "enc28j60.h"
+#include "../manager.h"
 
 /*********************************************
  * ENC28J60 Static Variables
@@ -8,17 +13,216 @@ extern void udp_packet_callback(enc28j60_pkt_t *pkt);
 
 extern manager_config_t config;
 
+extern u8 buffer[];
+static const char *label = "ENC28J60_Driver";
+
+u8 __temp_buffer[1500];					// Max Ethernet Packet Size for ENC28J60
+u8 __ip_fifo_data[4096];
+u8 __system_fifo_data[2048];
+
+enc28j60_fifo_t __ip_fifo = {
+		.write = 0, .read = 0,
+		.size = (sizeof (__ip_fifo_data) / sizeof (u8)),
+		.data = __ip_fifo_data
+};
+
+enc28j60_fifo_t __system_fifo = {
+		.write = 0, .read = 0,
+		.size = (sizeof (__system_fifo_data) / sizeof (u8)),
+		.data = __system_fifo_data
+};
+
+/*********************************************
+ * ENC28J60 FIFO Operations
+ *********************************************/
+
+void __enc28j60_fifo_add_byte(enc28j60_fifo_t *fifo, u8 byte)
+{
+	fifo->data[fifo->write] = byte;
+	fifo->write = (fifo->write + 1) % fifo->size;
+}
+
+bool enc28j60_fifo_write_packet(enc28j60_fifo_t *fifo, const enc28j60_pkt_t *pkt, u16 len)
+{
+	u8 *p = (u8 *) &pkt->eth_pkt;
+
+	// Checks if the packet fits in the FIFO
+	u16 fake_write = fifo->write;
+	for (u16 i = 0; i < len + 2; ++i)
+	{
+		fake_write = (fake_write + 1) % fifo->size;
+		if (fake_write == fifo->read)
+			return false;
+	}
+
+	// Adds the current packet length to the FIFO
+	__enc28j60_fifo_add_byte(fifo, (u8) (len >> 8));
+	__enc28j60_fifo_add_byte(fifo, (u8) len);
+
+	// Adds the packet itself to the FIFO
+	for (u16 i = 0; i < len; ++i)
+		__enc28j60_fifo_add_byte(fifo, p[i]);
+
+	return true;
+}
+
+u8 __enc28j60_fifo_read_byte(enc28j60_fifo_t *fifo)
+{
+	u8 byte = fifo->data[fifo->read];
+	fifo->read = (fifo->read + 1) % fifo->size;
+	return byte;
+}
+
+u16 enc28j60_fifo_read_packet(enc28j60_fifo_t *fifo, ethernet_pkt_t *pkt)
+{
+	if (fifo->read == fifo->write) return 0;
+
+	// Gets the length of the incoming packet
+	u16 len = __enc28j60_fifo_read_byte(fifo);
+	len <<= 8;
+	len |= __enc28j60_fifo_read_byte(fifo);
+
+	// Reads the length from the FIFO
+	u8 *p = (u8 *) pkt;
+	for (u16 i = 0; i < len; ++i)
+		p[i] = __enc28j60_fifo_read_byte(fifo);
+
+	// Returns the packet length
+	return len;
+}
+
+/*********************************************
+ * ENC28J60 Interrupts
+ *********************************************/
+
+/**
+ * Handles the interrupt from the ENC28J60
+ */
+void EXTI0_IRQHandler(void)
+{
+	// Clears the pending flag for the EXTI0
+	*EXTI_PR |= (_BV(0));
+
+	//
+	// Handles the events
+	//
+
+	// Checks which type of interrupt we are dealing with
+	u8 reg8 = enc28j60_eth_rcr(ENC28J60_EIR);
+	if (reg8 & _BV(ENC28J60_EIR_LINKIF))
+	{
+		// Checks if the link is UP or DOWN
+		if (enc28j60_is_link_up()) LOGGER_INFO(label, "LINK UP\n");
+		else LOGGER_INFO(label, "LINK Down\n");
+
+		// Clears the interrupt flags, since we're done processing
+		enc28j60_bfc(ENC28J60_EIR, _BV(ENC28J60_EIR_LINKIF));
+		enc28j60_phy_write(ENC28J60_PHIR, 0x00);
+	} else if (reg8 & _BV(ENC28J60_EIR_TXERIF))
+	{
+		LOGGER_INFO(label, "TXERRn\n");
+		enc28j60_bfc(ENC28J60_EIR, _BV(ENC28J60_EIR_TXERIF));
+	} else if (reg8 & _BV(ENC28J60_EIR_RXERIF))
+	{
+		LOGGER_INFO(label, "RXERR\n");
+		enc28j60_bfc(ENC28J60_EIR, _BV(ENC28J60_EIR_RXERIF));
+	}
+
+	//
+	// Handles the packets
+	//
+
+	// Creates an packet pointer to the temporary buffer, and starts reading
+	//  until we've got all the packets
+	enc28j60_pkt_t *pkt = (enc28j60_pkt_t *) __temp_buffer;
+	ethernet_pkt_t *eth_pkt = &pkt->eth_pkt;
+	u16 pkt_size;
+	while (enc28j60_packet_count() > 0)
+	{
+		pkt_size = enc28j60_read(pkt);
+
+		// Checks how to handle the packet, and if it is meant for us. If not
+		//  just discard, else add to the receive FIFO
+		switch (BSWAP16(eth_pkt->hdr.type))
+		{
+
+		case ETHERNET_PKT_TYPE_IPV4:
+		{
+			ip_pkt_t *ip_pkt = (ip_pkt_t *) eth_pkt->payload;
+
+			// Checks if the version is IPv4 and the IHL is 5, else discard packet
+			if (ip_pkt->hdr.ver != 4 || ip_pkt->hdr.ihl != 5) return;
+
+			// Checks the IPv4 body for our address, if it is not there, and it is not broadcast
+			//  just discard.
+			ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
+
+			// Checks if the packet is broadcast or if it contains our address
+			if (memcmp(ip_ipv4->da, config.ipv4_address, 4) != 0 &&
+				memcmp(ip_ipv4->da, config.ipv4_broadcast, 4) != 0) return;
+
+			// Stores the packet in the IP FIFO
+
+			if (!enc28j60_fifo_write_packet(&__ip_fifo, pkt, pkt_size))
+			{
+				LOGGER_INFO(label, "IPv4 FIFO Full\n");
+			}
+
+			break;
+		}
+
+		case ETHERNET_PKT_TYPE_ARP:
+		{
+			arp_pkt_t *arp_pkt = (arp_pkt_t *) eth_pkt->payload;
+
+			// If the ARP packet MAC is not 6 bytes long, or the protocol address
+			//  is not 4 bytes ( IPv4 ), ignore
+			if (arp_pkt->hdr.hln != 6 || arp_pkt->hdr.pln != 4) return;
+
+			// If the ARP packet THA doesn't match ours, or the ARP packet TPA doesn't
+			//  match ours, also discard packet
+			arp_payload_ipv4_t *arp_ipv4 = (arp_payload_ipv4_t *) arp_pkt->payload;
+			if (memcmp(arp_ipv4->tha, config.mac, 6) != 0 &&
+				memcmp(arp_ipv4->tpa, config.ipv4_address, 4) != 0) return;
+
+			// Stores the packet in the system FIFO
+			LOGGER_INFO(label, "System FIFO: %u write\n", pkt_size);
+			if (!enc28j60_fifo_write_packet(&__system_fifo, pkt, pkt_size))
+			{
+				LOGGER_INFO(label, "System FIFO Full\n");
+			}
+			break;
+		}
+
+		default:
+			break;
+		}
+	}
+
+	//
+	// Finishes
+	//
+
+	// Clears the interrupt flag on the ENC28J60
+	enc28j60_bfc(ENC28J60_ESTAT, _BV(ENC28J60_ESTAT_INT));
+}
+
 /*********************************************
  * ENC28J60 SPI
  *********************************************/
 
-void enc28j60_spi_init(void)
+inline void __enc28j60_clocks_init(void)
 {
-	// Enables the GPIOA Clock, and SPI1 Clock
 	*RCC_AHB1ENR |= (_BV(RCC_AHB1ENR_GPIOAEN));
-	*RCC_APB2ENR |= (_BV(RCC_APB2ENR_SPI1EN));
+	*RCC_APB2ENR |= (_BV(RCC_APB2ENR_SPI1EN) | _BV(RCC_APB2ENR_SYSCFGEN));
+}
 
-	// Configures GPIOA ( MISO, MOSI, SCK, CS )
+inline void __enc28j60_gpio_init(void)
+{
+	//
+	// Configures the SPI GPIO
+	//
+
 	*GPIO_MODER(GPIOA_BASE) &= ~(GPIO_MODE(7, GPIO_MODE_RESET) |
 			GPIO_MODE(6, GPIO_MODE_RESET) |
 			GPIO_MODE(5, GPIO_MODE_RESET) |
@@ -34,11 +238,43 @@ void enc28j60_spi_init(void)
 
 	*GPIO_OSPEEDR(GPIOA_BASE) |= (GPIO_OSPEED(8, GPIO_HIGH_SPEED));
 
-	// Configures the SPI Hardware
+	//
+	// Configures the EXTI GPIO
+	//
+
+	// Make PA0 input, and perform pull down
+	*GPIO_MODER(GPIOA_BASE) &= ~(GPIO_MODE(0, GPIO_MODE_RESET));
+	*GPIO_PUPDR(GPIOA_BASE) |= GPIO_PUPD(0, GPIO_PUPD_PULL_DOWN);
+}
+
+inline void __enc28j60_spi_init(void)
+{
 	*SPI_CR1(SPI1_BASE) = (SPI_CR1_BR(SPI_CR1_BR_DIV4) | _BV(SPI_CR1_MSTR));
 	*SPI_CR2(SPI1_BASE) = (_BV(SPI_CR2_SSOE));
 	*SPI_CR1(SPI1_BASE) |= (_BV(SPI_CR1_SPE));
+}
 
+inline void __enc29j60_external_interrupt_init(void)
+{
+	// Use PA0 for EXTI0
+	*SYSCFG_EXTICR1 &= ~SYSCFG_EXTICR_PXX(0xF, 0);
+	*SYSCFG_EXTICR1 |= SYSCFG_EXTICR_PXX(SYSCFG_EXTICR_PAX, 0);
+
+	// EXTI0 Hardware Interrupt Selection
+	*EXTI_FTSR |= (_BV(0));			// Falling Edge Trigger for EXTI0
+	*EXTI_IMR |= (_BV(0));			// Masks EXTI0
+	*EXTI_PR |= (_BV(0));			// Writes zero to the pending register
+
+	// Enables EXTI0 in the NVIC
+	NVIC_ISER->iser0 |= (_BV(6));
+}
+
+void enc28j60_spi_init(void)
+{
+	__enc28j60_clocks_init();
+	__enc28j60_gpio_init();
+	__enc28j60_spi_init();
+	__enc29j60_external_interrupt_init();
 }
 
 void enc28j60_spi_select(void)
@@ -331,17 +567,79 @@ bool enc28j60_is_link_up(void)
 	return (enc28j60_phy_read(ENC28J60_PHSTAT2) & (_BV(ENC28J60_PHSTAT2_LSTAT)));
 }
 
+enc28j60_phid_t	enc28j60_get_phid(void)
+{
+	u16 phid1 = enc28j60_phy_read(ENC28J60_PHID1),
+		phid2 = enc28j60_phy_read(ENC28J60_PHID2);
+
+	enc28j60_phid_t res = {
+		.pn = ((phid2 >> 4) & 0b00111111),
+		.rl = (phid2 & 0xF),
+		.id = (phid1 | (((phid2 >> 9) & 0b00111111) << 16))
+	};
+
+	return res;
+}
+
+u8 enc28j60_get_erevid(void)
+{
+	enc28j60_bank_select(ENC28J60_BANK_3);
+	switch (enc28j60_eth_rcr(ENC28J60_BK3_EREVID))
+	{
+	case 0b00000010: return 1;
+	case 0b00000100: return 4;
+	case 0b00000101: return 5;
+	case 0b00000110: return 7;
+	default: return 255;
+	}
+}
+
+void enc28j60_manual_trigger_interrupt(void)
+{
+	*EXTI_SWIER |= _BV(0);
+}
+
 /*********************************************
  * ENC28J60 Initialization
  *********************************************/
+
+inline void __enc28j60_interrupt_init(void)
+{
+	enc28j60_phy_write(ENC28J60_PHIE, (
+		_BV(ENC28J60_PHIE_PLNKIE) |
+		_BV(ENC28J60_PHIE_PGEIE)
+	));
+
+	enc28j60_wcr(ENC28J60_EIE, (
+		_BV(ENC28J60_EIE_INTIE) |
+		_BV(ENC28J60_EIE_PKTIE) |
+		_BV(ENC28J60_EIE_LINKIE) |
+		_BV(ENC28J60_EIE_TXERIE) |
+		_BV(ENC28J60_EIE_RXERIE)
+	));
+}
+
+inline void __enc28j60_filters_init(void)
+{
+	enc28j60_bank_select(ENC28J60_BANK_1);
+	enc28j60_wcr(ENC28J60_BK1_ERXFCON, (
+			_BV(ENC28J60_BK1_ERXFCON_UCEN) |
+			_BV(ENC28J60_BK1_ERXFCON_CRCEN) |
+			_BV(ENC28J60_BK1_ERXFCON_BCEN)
+	));
+}
 
 void enc28j60_init(void)
 {
 	// Performs full system reset
 	enc28j60_src();
 
-	// Waits for the system clock to be ready
+	// Waits for the system clock to be ready, and checks if CLKRDY set early
+	//  needs to be fixed
 	enc28j60_eth_wait_until_set(ENC28J60_ESTAT, ENC28J60_ESTAT_CLKRDY);
+	u8 erevid = enc28j60_get_erevid();
+	if (erevid == 1 || erevid == 4 || erevid == 5 || erevid == 7)
+		delay_ms(1); // Minimum of 300us required, we will do 1ms
 
 	// Disables RX
 	enc28j60_rx_disable();
@@ -354,6 +652,10 @@ void enc28j60_init(void)
 
 	// Enables RX
 	enc28j60_rx_enable();
+
+	// Enables the interrupts
+	__enc28j60_interrupt_init();
+	__enc28j60_filters_init();
 }
 
 void enc28j60_phy_init(void)
@@ -533,6 +835,9 @@ void enc28j60_write(const enc28j60_pkt_t *pkt, u16 len)
 
 	enc28j60_bank_select(ENC28J60_BANK_0);
 
+	// Waits until we can transmit safely
+	enc28j60_eth_wait_until_clear(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
+
 	// 1. Appropriately program the ETXST Pointer to
 	//  point to an unused location in memory. It will
 	//  point to the per packet control byte. In the
@@ -585,17 +890,18 @@ void enc28j60_write(const enc28j60_pkt_t *pkt, u16 len)
 	enc28j60_bfs(ENC28J60_ECON1, _BV(ENC28J60_ECON1_TXRTS));
 
 	// 6. Wait for the TXRTS bit to be cleared
-	enc28j60_eth_wait_until_clear(ENC28J60_ECON1, ENC28J60_ECON1_TXRTS);
+
+	// Done at start
 }
 
-bool enc28j60_read(enc28j60_pkt_t *pkt)
+u16 enc28j60_read(enc28j60_pkt_t *pkt)
 {
 	u16 read_pointer, next_packet_pointer;
 	enc28j60_status_vector_t status_vector;
 
 	// Checks if there are any packets available for reading
 	u8 pkt_count = enc28j60_packet_count();
-	if (pkt_count == 0) return false;
+	if (pkt_count == 0) return 0;
 
 	// Selects bank 0
 	enc28j60_bank_select(ENC28J60_BANK_0);
@@ -622,208 +928,6 @@ bool enc28j60_read(enc28j60_pkt_t *pkt)
 	// Decrements the packet counter
 	enc28j60_bfs(ENC28J60_ECON2, (_BV(ENC28J60_ECON2_PKTDEC)));
 
-	return true;
+	return status_vector.rbc;
 }
 
-
-void enc28j60_poll(u8 *buffer)
-{
-	enc28j60_pkt_t *pkt = (enc28j60_pkt_t *) buffer;
-	if (!enc28j60_read(pkt)) return;
-
-	// Checks the packet type, so we can handle the packet
-	//  accordingly
-	switch (BSWAP16(pkt->eth_pkt.hdr.type))
-	{
-	case ETHERNET_PKT_TYPE_IPV4:
-		enc28j60_handle_ipv4(pkt);
-		break;
-	case ETHERNET_PKT_TYPE_ARP:
-		enc28j60_handle_arp(pkt);
-		break;
-	default:
-		break;
-	}
-}
-
-/*********************************************
- * ENC28J60 Networking ( ARP )
- *********************************************/
-
-void enc28j60_handle_arp_reply(enc28j60_pkt_t *pkt)
-{
-	arp_pkt_t *arp_pkt = (arp_pkt_t *) pkt->eth_pkt.payload;
-
-	// Checks if the hardware address length is correct
-	if (arp_pkt->hdr.hln != 6) return;
-}
-
-void enc28j60_handle_arp_request(enc28j60_pkt_t *pkt)
-{
-	arp_pkt_t *arp_pkt = (arp_pkt_t *) pkt->eth_pkt.payload;
-
-	// Checks if the hardware address length is correct
-	if (arp_pkt->hdr.hln != 6) return;
-
-	// Checks if the request is IPv4 or IPv6
-	switch (arp_pkt->hdr.pln)
-	{
-	case 4:
-	{
-		arp_payload_ipv4_t *arp_ipv4_t = (arp_payload_ipv4_t *) arp_pkt->payload;
-
-		// Checks if our hardware address, or our protocol address is
-		//  present in the packet, and respond accordingly
-		if (memcmp(arp_ipv4_t->tpa, config.ipv4_address, 4) == 0 || memcmp(arp_ipv4_t->tha, config.mac, 6) == 0)
-		{
-			// Prepares the ARP reply, by first copying the source addresses
-			//  into the destination ones
-			memcpy(arp_ipv4_t->tha, arp_ipv4_t->sha, 6);
-			memcpy(arp_ipv4_t->tpa, arp_ipv4_t->spa, 4);
-
-			// Modifies the opcode, and puts our info into the source addresses
-			arp_pkt->hdr.op = BSWAP16(ARP_PKT_OP_REPLY);
-			memcpy(arp_ipv4_t->sha, config.mac, 6);
-			memcpy(arp_ipv4_t->spa, config.ipv4_address, 4);
-
-			// Writes the response packet
-			enc28j60_write(pkt, sizeof (arp_pkt_t) + sizeof (arp_payload_ipv4_t));
-		}
-
-		break;
-	}
-	case 6:
-		break;
-	default:
-		break;
-	}
-}
-
-void enc28j60_handle_arp(enc28j60_pkt_t *pkt)
-{
-	arp_pkt_t *arp_pkt = (arp_pkt_t *) pkt->eth_pkt.payload;
-
-	switch (BSWAP16(arp_pkt->hdr.op))
-	{
-	case ARP_PKT_OP_REQUEST:
-		enc28j60_handle_arp_request(pkt);
-		break;
-	case ARP_PKT_OP_REPLY:
-		enc28j60_handle_arp_reply(pkt);
-		break;
-	default:
-		break;
-	}
-}
-
-/*********************************************
- * ENC28J60 Networking ( IP )
- *********************************************/
-
-void enc28j60_ipv4_prepare(ip_pkt_t *ip_pkt, u8 *ipv4)
-{
-	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
-
-	memcpy(ip_ipv4->da, ipv4, 4);
-	memcpy(ip_ipv4->sa, config.ipv4_address, 4);
-
-	ip_pkt->hdr.ihl = 5;
-	ip_pkt->hdr.ver = 4;
-	ip_pkt->hdr.ttl = 60;
-	ip_pkt->hdr.tos = (IP_HDR_TOS_PRECEDENCE(IP_HDR_TOS_PRECEDENCE_ROUTINE));
-}
-
-void enc28j60_ipv4_finish(ip_pkt_t *ip_pkt)
-{
-	ip_pkt->hdr.cs = 0;
-	ip_pkt->hdr.cs = checksum_oc16((u16 *) ip_pkt, (ip_pkt->hdr.ihl * 2));
-}
-
-void enc28j60_handle_ipv4(enc28j60_pkt_t *pkt)
-{
-	ethernet_pkt_t *eth_pkt = (ethernet_pkt_t *) &pkt->eth_pkt;
-	ip_pkt_t *ip_pkt = (ip_pkt_t *) eth_pkt->payload;
-	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
-
-	// Checks if the checksum is valid, else discard
-	//  the IP packet
-	if (checksum_oc16((u16 *) ip_pkt, (ip_pkt->hdr.ihl * 2)) != 0xFFFF)
-		return;
-
-	// Checks if the packet matches our IPv4, or is an broadcast packet
-	if (memcmp(ip_ipv4->da, config.ipv4_address, 4) != 0
-			&& memcmp(ip_ipv4->da, config.ipv4_broadcast, 4) != 0) return;
-
-	// Checks the protocol, and calls the required handler
-	switch (ip_pkt->hdr.proto)
-	{
-	case IP_HDR_PROTO_ICMP:
-		enc28j60_handle_icmp_ipv4(pkt);
-		break;
-	case IP_HDR_PROTO_UDP:
-		enc28j60_handle_ipv4_udp(pkt);
-		break;
-	case IP_HDR_PROTO_TCP:
-		break;
-	}
-}
-
-/*********************************************
- * ENC28J60 Networking ( ICMP )
- *********************************************/
-
-void enc28j60_handle_icmp_ipv4(enc28j60_pkt_t *pkt)
-{
-	ethernet_pkt_t *eth_pkt = (ethernet_pkt_t *) &pkt->eth_pkt;
-	ip_pkt_t *ip_pkt = (ip_pkt_t *) eth_pkt->payload;
-	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
-	icmp_pkt_t *icmp_pkt = (icmp_pkt_t * ) ip_ipv4->payload;
-
-	// Validates the checksum
-	if (icmp_calc_cs(icmp_pkt, BSWAP16(ip_pkt->hdr.tl) - (ip_pkt->hdr.ihl * 4)) != 0xFFFF)
-		return;
-
-	// Checks the ICMP type, and how to handle it
-	switch (icmp_pkt->hdr.type)
-	{
-	case ICMP_TYPE_ECHO:
-	{
-		enc28j60_pkt_prepare(pkt, eth_pkt->hdr.sa, ETHERNET_PKT_TYPE_IPV4);
-
-		enc28j60_ipv4_prepare(ip_pkt, ip_ipv4->sa);
-		ip_pkt->hdr.proto = IP_HDR_PROTO_ICMP;
-		enc28j60_ipv4_finish(ip_pkt);
-
-		icmp_pkt->hdr.type = ICMP_TYPE_ECHO_REPLY;
-		icmp_pkt->hdr.code = ICMP_ERM_CODE;
-		icmp_pkt->hdr.cs = 0;
-		icmp_pkt->hdr.cs = icmp_calc_cs(icmp_pkt, BSWAP16(ip_pkt->hdr.tl) - (ip_pkt->hdr.ihl * 4));
-
-		enc28j60_write(pkt, BSWAP16(ip_pkt->hdr.tl));
-		break;
-	}
-	}
-}
-
-/*********************************************
- * ENC28J60 Networking ( UDP )
- *********************************************/
-
-void enc28j60_ipv4_udp_prepare(ip_pkt_t *ip_pkt, udp_pkt_t *udp_pkt, u16 port)
-{
-	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
-	ip_pkt->hdr.proto = IP_HDR_PROTO_UDP;
-	ip_pkt->hdr.f = BSWAP16(0x00);
-	ip_pkt->hdr.id = BSWAP16(0x00);
-	ip_pkt->hdr.tl = BSWAP16((ip_pkt->hdr.ihl * 4) + sizeof (udp_pkt_t) + BSWAP16(udp_pkt->hdr.l));
-
-	udp_pkt->hdr.sp = BSWAP16(0);
-	udp_pkt->hdr.dp = BSWAP16(port);
-	udp_pkt->hdr.cs = 0;
-	udp_pkt->hdr.cs = udp_calc_cs(udp_pkt, ip_ipv4->da, ip_ipv4->sa, 4, 4, IP_HDR_PROTO_UDP);
-}
-
-void enc28j60_handle_ipv4_udp(enc28j60_pkt_t *pkt)
-{
-	udp_packet_callback(pkt);
-}

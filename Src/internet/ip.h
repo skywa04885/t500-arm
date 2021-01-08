@@ -6,6 +6,7 @@
  *********************************************/
 
 #include "../types.h"
+#include "checksum.h"
 
 /*********************************************
  * Data Types
@@ -53,5 +54,11 @@ typedef struct __attribute__ (( packed ))
 	ip_hdr_t	hdr;
 	u8			payload[0];
 } ip_pkt_t;
+
+/*********************************************
+ * Prototypes
+ *********************************************/
+
+u16 ip_calc_cs(ip_pkt_t *ip_pkt);
 
 #endif

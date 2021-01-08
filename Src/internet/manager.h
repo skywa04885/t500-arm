@@ -69,6 +69,26 @@ typedef struct
  *********************************************/
 
 void 	manager_init(void);
-void 	manager_poll(void);
+void	manager_poll(void);
+
+/*********************************************
+ * Network Layer ( IP )
+ *********************************************/
+
+void	manager_handle_ip(ethernet_pkt_t *eth_pkt);
+
+/*********************************************
+ * Network Layer ( ICMP )
+ *********************************************/
+
+void	manager_handle_icmp(ethernet_pkt_t *eth_pkt);
+void	manager_handle_icmp_echo_request(ethernet_pkt_t *eth_pkt);
+
+/*********************************************
+ * Network Layer ( ARP )
+ *********************************************/
+
+void	manager_handle_arp_request(ethernet_pkt_t *eth_pkt);
+void 	manager_handle_arp_reply(ethernet_pkt_t *eth_pkt);
 
 #endif

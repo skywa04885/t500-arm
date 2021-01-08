@@ -2,8 +2,9 @@
 
 void delay_init(void)
 {
-	*TIM_CR1(TIM1_BASE) = 0;			// Do nothing
-	*TIM_PSC(TIM1_BASE) = 180;			// 180Mhz -> 1Mhz, so every microsecond
+	*RCC_APB2ENR |= (_BV(RCC_APB2ENR_TIM1EN));	// Enables the clock
+	*TIM_CR1(TIM1_BASE) = 0;					// Do nothing
+	*TIM_PSC(TIM1_BASE) = 180;					// 180Mhz -> 1Mhz, so every microsecond
 }
 
 void delay_ns(uint16_t ns)

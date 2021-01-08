@@ -5,12 +5,12 @@
 
 #define RCC_BASE							0x40023800
 
-#define RCC_CR							((u32 *) (RCC_BASE + 0x00))
-#define RCC_PLLCFGR						((u32 *) (RCC_BASE + 0x04))
-#define RCC_CFGR							((u32 *) (RCC_BASE + 0x08))
-#define RCC_AHB1ENR						((u32 *) (RCC_BASE + 0x30))
-#define RCC_APB1ENR						((u32 *) (RCC_BASE + 0x40))
-#define RCC_APB2ENR						((u32 *) (RCC_BASE + 0x44))
+#define RCC_CR							((volatile u32 *) (RCC_BASE + 0x00))
+#define RCC_PLLCFGR						((volatile u32 *) (RCC_BASE + 0x04))
+#define RCC_CFGR							((volatile u32 *) (RCC_BASE + 0x08))
+#define RCC_AHB1ENR						((volatile u32 *) (RCC_BASE + 0x30))
+#define RCC_APB1ENR						((volatile u32 *) (RCC_BASE + 0x40))
+#define RCC_APB2ENR						((volatile u32 *) (RCC_BASE + 0x44))
 
 #define RCC_CR_PLLSAIRDY					29
 #define RCC_CR_PLLSAION					28
@@ -72,10 +72,12 @@
 #define RCC_AHB1ENR_GPIOBEN				1
 
 #define RCC_APB2ENR_SPI1EN				12
+#define RCC_APB2ENR_SYSCFGEN				14
 #define RCC_APB2ENR_TIM11EN				18
 #define RCC_APB2ENR_TIM10EN				17
+#define RCC_APB2ENR_TIM1EN				0
 
-#define RCC_APB1ENR_USART2EN			17
+#define RCC_APB1ENR_USART2EN				17
 #define RCC_APB1ENR_TIM2EN				0
 #define RCC_APB1ENR_TIM3EN				1
 #define RCC_APB1ENR_TIM4EN				2

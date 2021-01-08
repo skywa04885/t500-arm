@@ -1,0 +1,23 @@
+#ifndef _SRC_HARDWARE_SYSCFG_H
+#define _SRC_HARDWARE_SYSCFG_H
+
+#define SYSCFG_BASE					0x40013800
+
+typedef enum
+{
+  SYSCFG_EXTICR_PAX = 0b0000,
+  SYSCFG_EXTICR_PBX,
+  SYSCFG_EXTICR_BCX,
+  SYSCFG_EXTICR_PDX,
+  SYSCFG_EXTICR_PEX,
+  SYSCFG_EXTICR_PFX,
+  SYSCFG_EXTICR_PGX,
+  SYSCFG_EXTICR_PHX
+} syscfg_exti_port_select_t;
+
+#define SYSCFG_EXTICR_PXX(A, B)		(((A) & 0xF) << (B * 4))
+
+#define SYSCFG_EXTICR1				((volatile u32 *) (SYSCFG_BASE + 0x08))
+
+#endif
+

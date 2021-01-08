@@ -35,6 +35,16 @@
 
 #define ENC28J60_BK1_EPKTCNT			0x19
 
+#define ENC28J60_BK1_ERXFCON			0x18
+#define ENC28J60_BK1_ERXFCON_UCEN	7
+#define ENC28J60_BK1_ERXFCON_ANDOR	6
+#define ENC28J60_BK1_ERXFCON_CRCEN	5
+#define ENC28J60_BK1_ERXFCON_PMEN	4
+#define ENC28J60_BK1_ERXFCON_MPEN	3
+#define ENC28J60_BK1_ERXFCON_HTEN	2
+#define ENC28J60_BK1_ERXFCON_MCEN	1
+#define ENC28J60_BK1_ERXFCON_BCEN	0
+
 /*********************************************
  * ENC28J60 Bank 2 Registers
  *********************************************/
@@ -96,6 +106,8 @@
 #define ENC28J60_BK3_MISTAT_SCAN		1
 #define ENC28J60_BK3_MISTAT_NVALID	2
 
+#define ENC28J60_BK3_EREVID			0x12
+
 /*********************************************
  * ENC28J60 NON-BANK Registers
  *********************************************/
@@ -150,12 +162,12 @@
  *********************************************/
 
 #define ENC28J60_PHCON1				0x00
-#define ENC28J60_PHCON1_PRST		15
+#define ENC28J60_PHCON1_PRST			15
 #define ENC28J60_PHCON1_PLOOPBK		14
 #define ENC28J60_PHCON1_PPWRSV		11
 #define ENC28J60_PHCON1_PDPXMD		8
 
-#define ENC28J60_PHSTAT1			0x01
+#define ENC28J60_PHSTAT1				0x01
 #define ENC28J60_PHSTAT1_PFDPX		12
 #define ENC28J60_PHSTAT1_PHDPX		11
 #define ENC28J60_PHSTAT1_LLSTAT		2
@@ -170,16 +182,23 @@
 #define ENC28J60_PHCON2_JABBER		10
 #define ENC28J60_PHCON2_HDLDIS		8
 
-#define ENC28J60_PHSTAT2			0x11
+#define ENC28J60_PHSTAT2				0x11
 #define ENC28J60_PHSTAT2_TXSTAT		13
 #define ENC28J60_PHSTAT2_RXSTAT		12
-#define ENC28J60_PHSTAT2_COLSTAT	11
+#define ENC28J60_PHSTAT2_COLSTAT		11
 #define ENC28J60_PHSTAT2_LSTAT		10
-#define ENC28J60_PHSTAT2_DPXSTAT	9
+#define ENC28J60_PHSTAT2_DPXSTAT		9
 #define ENC28J60_PHSTAT2_PLRITY		5
 
 #define ENC28J60_PHIE				0x12
+
+#define ENC28J60_PHIE_PLNKIE			4
+#define ENC28J60_PHIE_PGEIE			1
+
 #define ENC28J60_PHIR				0x13
+
+#define ENC28J60_PHIR_PLNKIF			4
+#define ENC28J60_PHIR_PGIF			1
 
 #define ENC28J60_PHLCON				0x14
 #define ENC28J60_PHLCON_STRCH		1

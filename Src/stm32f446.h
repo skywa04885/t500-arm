@@ -17,7 +17,7 @@ typedef struct __attribute__ (( packed ))
 	uint32_t iser7;
 } nvic_iser_t;
 
-#define NVIC_ISER						((nvic_iser_t *) 0xE000E100)
+#define NVIC_ISER						((volatile nvic_iser_t *) 0xE000E100)
 
 typedef struct __attribute__ (( packed ))
 {
@@ -31,7 +31,7 @@ typedef struct __attribute__ (( packed ))
 	uint32_t icpr7;
 } nvic_icpr_t;
 
-#define NVIC_ICPR						((nvic_icpr_t *) 0xE000E280)
+#define NVIC_ICPR						((volatile nvic_icpr_t *) 0xE000E280)
 
 #define NVIC_ISER0_TIM2					28
 #define NVIC_ISER0_TIM3					29
@@ -59,26 +59,26 @@ typedef struct __attribute__ (( packed ))
 
 /* Timer offsets */
 
-#define TIM_CR1(A)				((uint16_t *) (A + 0x00))
-#define TIM_CR2(A)				((uint16_t *) (A + 0x04))
-#define TIM_SMCR(A)				((uint16_t *) (A + 0x08))
-#define TIM_DIER(A)				((uint16_t *) (A + 0x0C))
-#define TIM_SR(A)				((uint16_t *) (A + 0x10))
-#define TIM_EGR(A)				((uint16_t *) (A + 0x14))
-#define TIM_CCMR1(A)				((uint16_t *) (A + 0x18))
-#define TIM_CCMR2(A)				((uint16_t *) (A + 0x1C))
-#define TIM_CCER(A)				((uint16_t *) (A + 0x20))
-#define TIM_CNT(A)				((uint32_t *) (A + 0x24))
-#define TIM_PSC(A)				((uint16_t *) (A + 0x28))
-#define TIM_ARR(A)				((uint32_t *) (A + 0x2C))
-#define TIM_RCR(A)				((uint16_t *) (A + 0x30))
-#define TIM_CCR1(A)				((uint32_t *) (A + 0x34))
-#define TIM_CCR2(A)				((uint32_t *) (A + 0x38))
-#define TIM_CCR3(A)				((uint32_t *) (A + 0x3C))
-#define TIM_CCR4(A)				((uint32_t *) (A + 0x40))
-#define TIM_BDTR(A)				((uint16_t *) (A + 0x44))
-#define TIM_DCR(A)				((uint16_t *) (A + 0x48))
-#define TIM_DMAR(A)				((uint16_t *) (A + 0x4C))
+#define TIM_CR1(A)				((volatile uint16_t *) (A + 0x00))
+#define TIM_CR2(A)				((volatile uint16_t *) (A + 0x04))
+#define TIM_SMCR(A)				((volatile uint16_t *) (A + 0x08))
+#define TIM_DIER(A)				((volatile uint16_t *) (A + 0x0C))
+#define TIM_SR(A)				((volatile uint16_t *) (A + 0x10))
+#define TIM_EGR(A)				((volatile uint16_t *) (A + 0x14))
+#define TIM_CCMR1(A)				((volatile uint16_t *) (A + 0x18))
+#define TIM_CCMR2(A)				((volatile uint16_t *) (A + 0x1C))
+#define TIM_CCER(A)				((volatile uint16_t *) (A + 0x20))
+#define TIM_CNT(A)				((volatile uint32_t *) (A + 0x24))
+#define TIM_PSC(A)				((volatile uint16_t *) (A + 0x28))
+#define TIM_ARR(A)				((volatile uint32_t *) (A + 0x2C))
+#define TIM_RCR(A)				((volatile uint16_t *) (A + 0x30))
+#define TIM_CCR1(A)				((volatile uint32_t *) (A + 0x34))
+#define TIM_CCR2(A)				((volatile uint32_t *) (A + 0x38))
+#define TIM_CCR3(A)				((volatile uint32_t *) (A + 0x3C))
+#define TIM_CCR4(A)				((volatile uint32_t *) (A + 0x40))
+#define TIM_BDTR(A)				((volatile uint16_t *) (A + 0x44))
+#define TIM_DCR(A)				((volatile uint16_t *) (A + 0x48))
+#define TIM_DMAR(A)				((volatile uint16_t *) (A + 0x4C))
 
 /* TIM_EGR */
 #define TIM_EGR_UG				0

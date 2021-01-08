@@ -16,11 +16,15 @@
 #include "../../hardware/spi.h"
 #include "../../hardware/gpio.h"
 #include "../../hardware/rcc.h"
+#include "../../hardware/exti.h"
+#include "../../hardware/syscfg.h"
+#include "../../delay.h"
+#include "../../stm32f446.h"
 #include "../../types.h"
 
 #include "../checksum.h"
 #include "../bswap.h"
-#include "../manager.h"
+#include "../../logger.h"
 
 #include "enc28j60_registers.h"
 
@@ -65,9 +69,37 @@ typedef struct __attribute__ (( packed ))
 	ethernet_pkt_t eth_pkt;
 } enc28j60_pkt_t;
 
+typedef struct
+{
+	u16 write, read, size;
+	u8 *data;
+} enc28j60_fifo_t;
+
+typedef struct
+{
+	u8 		pn;		/* Part Number */
+	u8		rl;		/* Revision Level */
+	u32		id;		/* PHY ID */
+} enc28j60_phid_t;
+
+/*********************************************
+ * ENC28J60 FIFO Operations
+ *********************************************/
+
+void 		__enc28j60_fifo_add_byte(enc28j60_fifo_t *fifo, u8 byte);
+bool 		enc28j60_fifo_write_packet(enc28j60_fifo_t *fifo, const enc28j60_pkt_t *pkt, u16 len);
+
+u8 			__enc28j60_fifo_read_byte(enc28j60_fifo_t *fifo);
+u16 		enc28j60_fifo_read_packet(enc28j60_fifo_t *fifo, ethernet_pkt_t *pkt);
+
 /*********************************************
  * ENC28J60 SPI
  *********************************************/
+
+void 		__enc28j60_clocks_init(void);
+void 		__enc28j60_gpio_init(void);
+void		__enc28j60_spi_init(void);
+void 		__enc29j60_external_interrupt_init(void);
 
 void 		enc28j60_spi_init(void);
 void		enc28j60_spi_select(void);
@@ -118,10 +150,18 @@ void		enc28j60_rx_enable(void);
 void		enc28j60_rx_disable(void);
 
 bool		enc28j60_is_link_up(void);
+u8			enc28j60_get_erevid(void);
+
+enc28j60_phid_t		enc28j60_get_phid(void);
+
+void		enc28j60_manual_trigger_interrupt(void);
 
 /*********************************************
  * ENC28J60 Initialization
  *********************************************/
+
+void		__enc28j60_interrupt_init(void);
+void		__enc28j60_filters_init(void);
 
 void 		enc28j60_init(void);
 void 		enc28j60_phy_init(void);
@@ -136,36 +176,6 @@ void 		enc28j60_mac_init(void);
 u8			enc28j60_packet_count(void);
 void		enc28j60_pkt_prepare(enc28j60_pkt_t *pkt, uint8_t *da, u16 type);
 void		enc28j60_write(const enc28j60_pkt_t *pkt, u16 len);
-bool		enc28j60_read(enc28j60_pkt_t *pkt);
-void 		enc28j60_poll(u8 *buffer);
-
-/*********************************************
- * ENC28J60 Networking ( ARP )
- *********************************************/
-
-void 		enc28j60_handle_arp(enc28j60_pkt_t *pkt);
-void 		enc28j60_handle_arp_reply(enc28j60_pkt_t *pkt);
-void 		enc28j60_handle_arp_request(enc28j60_pkt_t *pkt);
-
-/*********************************************
- * ENC28J60 Networking ( IP )
- *********************************************/
-
-void		enc28j60_ipv4_prepare(ip_pkt_t *ip_pkt, u8 *ipv4);
-void 		enc28j60_ipv4_finish(ip_pkt_t *ip_pkt);
-void		enc28j60_handle_ipv4(enc28j60_pkt_t *pkt);
-
-/*********************************************
- * ENC28J60 Networking ( ICMP )
- *********************************************/
-
-void		enc28j60_handle_icmp_ipv4(enc28j60_pkt_t *pkt);
-
-/*********************************************
- * ENC28J60 Networking ( UDP )
- *********************************************/
-
-void 		enc28j60_ipv4_udp_prepare(ip_pkt_t *ip_pkt, udp_pkt_t *udp_pkt, u16 port);
-void		enc28j60_handle_ipv4_udp(enc28j60_pkt_t *pkt);
+u16			enc28j60_read(enc28j60_pkt_t *pkt);
 
 #endif

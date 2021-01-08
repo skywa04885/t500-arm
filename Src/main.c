@@ -86,8 +86,8 @@ STEPPER_ISR(TIM4_IRQHandler, stepper2);
  * Global Variables
  ***********************************/
 
-u8 buffer[2048];
-u8 write_buffer[2048];
+u8 write_buffer[1500];
+u8 read_buffer[1500];
 
 stepper_t *stepper_motors[] = {
 		&stepper0,
@@ -96,6 +96,8 @@ stepper_t *stepper_motors[] = {
 		&stepper3
 };
 u8 stepper_motors_count = sizeof (stepper_motors) / sizeof (stepper_t *);
+
+extern enc28j60_fifo_t __system_fifo;
 
 /***********************************
  * Functions
@@ -127,13 +129,14 @@ int main(void)
 {
 	// Performs the configuration
 	clock_init();
-	usart2_init(500000);
 	delay_init();
-	steppers_init();
+	usart2_init(500000);
 	manager_init();
 
-	stepper_enable(&stepper0);
+//	steppers_init();
+//	stepper_enable(&stepper0);
 
+	/*
 	// Servo Test
 
 	// Enables TIM10 in RCC
@@ -170,7 +173,7 @@ int main(void)
 	*TIM_CCER &= ~(_BV(TIM_CCER_CC1P)); 		// OC1 Active High
 
 	for (;;);
-
+	*/
 
 
 	// Prints the MAC address
