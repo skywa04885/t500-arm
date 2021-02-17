@@ -64,6 +64,11 @@ typedef struct
 	unsigned full_duplex : 1;
 } manager_config_t;
 
+typedef struct
+{
+	u8	*mac, *ipv4;
+} manager_arp_resolve_t;
+
 /*********************************************
  * Prototypes
  *********************************************/
@@ -90,5 +95,19 @@ void	manager_handle_icmp_echo_request(ethernet_pkt_t *eth_pkt);
 
 void	manager_handle_arp_request(ethernet_pkt_t *eth_pkt);
 void 	manager_handle_arp_reply(ethernet_pkt_t *eth_pkt);
+
+void	manager_ipv4s_to_macs(manager_arp_resolve_t *resolve, u8 total);
+
+/*********************************************
+ * Transport Layer ( UDP )
+ *********************************************/
+
+void	manager_handle_udp(ethernet_pkt_t *eth_pkt);
+
+/*********************************************
+ * Application Layer ( DNS )
+ *********************************************/
+
+void	manager_send_dns(const char *domain);
 
 #endif

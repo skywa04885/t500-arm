@@ -1,5 +1,7 @@
 #include "main.h"
 
+#define LABEL "main"
+
 /***********************************
  * Global variables
  ***********************************/
@@ -98,10 +100,249 @@ stepper_t *stepper_motors[] = {
 u8 stepper_motors_count = sizeof (stepper_motors) / sizeof (stepper_t *);
 
 extern enc28j60_fifo_t __system_fifo;
+extern manager_config_t config;
 
 /***********************************
  * Functions
  ***********************************/
+
+void manager_handle_control_packet(ethernet_pkt_t *eth_pkt)
+{
+	ip_pkt_t *ip_pkt = (ip_pkt_t *) eth_pkt->payload;
+	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
+	udp_pkt_t *udp_pkt = (udp_pkt_t *) ip_ipv4->payload;
+	control_pkt_t *control_pkt = (control_pkt_t *) udp_pkt->payload;
+
+	// Checks the control packet opcode, which will tell us what functions we should
+	//  call, and what response to send.
+	switch (control_pkt->opcode)
+	{
+		case CONTROL_PKT_OP_STEPPER_STATUS:
+		{
+			//
+			// Parses the arguments
+			//
+
+			u8 motor = 0;
+
+			// Parses the arguments
+			control_pkt_arg_t *arg = (control_pkt_arg_t *) control_pkt->payload;
+			do
+			{
+				if (arg->t == CONTROL_PKT_ARG_TYPE_U8)
+					motor = ((control_pkt_arg_u8_t *) arg->payload)->val;
+			} while ((arg = control_pkt_arg_parse_next(arg)) != NULL);
+
+			// Checks if the motor number is actually available
+			if (motor >= stepper_motors_count) return;
+
+			//
+			// Builds the status
+			//
+
+			stepper_t *stepper = stepper_motors[motor];
+
+			u8 flags = 0x00;
+			if (stepper->stepper_enabled)
+				flags |= (_BV(CONTROL_PKT_ARG_MOTOR_FLAG_ENABLED));
+			if (stepper->stepper_moving)
+				flags |= (_BV(CONTROL_PKT_ARG_MOTOR_FLAG_MOVING));
+
+			control_pkt_arg_stepper_status_t status = {
+					.id = motor,
+					.flags = flags,
+					.sps = stepper->cop.current_sps,
+					.cpos = stepper->position,
+					.tpos = stepper->cop.target_pos,
+			};
+
+			//
+			// Sends the status
+			//
+
+			// Builds the response packet
+			memset(write_buffer, 0, 1000);
+			enc28j60_pkt_t *resp_pkt = (enc28j60_pkt_t *) write_buffer;
+			ip_pkt_t *resp_ip_pkt = (ip_pkt_t *) resp_pkt->eth_pkt.payload;
+			control_pkt_t *resp_control_pkt = pkt_builder_control_reply((u8 *) &resp_pkt->eth_pkt, eth_pkt->hdr.sa, ip_ipv4->sa, 60, CONTROL_PKT_OP_STEPPER_STATUS, control_pkt->sn);
+			control_pkt_arg_t *resp_arg = (control_pkt_arg_t *) resp_control_pkt->payload;
+
+			// Builds the arguments
+			u16 resp_payload_size = 0;
+
+			resp_arg = control_pkt_arg_add_stepper_status(resp_arg, &status);
+			resp_payload_size += sizeof (control_pkt_arg_t) + sizeof (control_pkt_arg_stepper_status_t);
+
+			resp_arg = control_pkt_arg_end(resp_arg);
+			resp_payload_size += sizeof (control_pkt_arg_t);
+
+			// Finishes and writes the response packet
+			pkt_builder_control_reply_finish(resp_ip_pkt, resp_payload_size);
+			enc28j60_write(resp_pkt, BSWAP16(resp_ip_pkt->hdr.tl));
+
+			break;
+		}
+		case CONTROL_PKT_OP_STEPPER_DISABLE:
+		case CONTROL_PKT_OP_STEPPER_ENABLE:
+		{
+			//
+			// Parses the arguments
+			//
+
+			u8 motor = 0;
+
+			// Parses the arguments
+			control_pkt_arg_t *arg = (control_pkt_arg_t *) control_pkt->payload;
+			do
+			{
+				if (arg->t == CONTROL_PKT_ARG_TYPE_U8)
+					motor = ((control_pkt_arg_u8_t *) arg->payload)->val;
+			} while ((arg = control_pkt_arg_parse_next(arg)) != NULL);
+
+			// Checks if the motor number is actually available
+			if (motor >= stepper_motors_count) return;
+
+			//
+			// Enables / Disables the stepper the stepper
+			//
+
+			if (control_pkt->opcode == CONTROL_PKT_OP_STEPPER_DISABLE)
+				stepper_disable(stepper_motors[motor]);
+			else
+				stepper_enable(stepper_motors[motor]);
+
+			break;
+		}
+		case CONTROL_PKT_OP_STEPPER_MOVE_TO:
+		{
+			//
+			// Parses the arguments
+			//
+
+			u8 motor = 0;
+			i32 pos = 0;
+
+			// Parses the arguments
+			control_pkt_arg_t *arg = (control_pkt_arg_t *) control_pkt->payload;
+			do
+			{
+				switch (arg->t)
+				{
+					case CONTROL_PKT_ARG_TYPE_U8:
+						motor = ((control_pkt_arg_u8_t *) arg->payload)->val;
+						break;
+					case CONTROL_PKT_ARG_TYPE_I32:
+						pos = ((control_pkt_arg_i32_t *) arg->payload)->val;
+						break;
+					default:
+						break;
+				}
+			} while ((arg = control_pkt_arg_parse_next(arg)) != NULL);
+
+			// Checks if the motor number is actually available
+			if (motor >= stepper_motors_count) return;
+
+			//
+			// Moves the stepper
+			//
+
+			// Moves the motor
+			stepper_simple_move(stepper_motors[motor], pos);
+
+			break;
+		}
+		case CONTROL_PKT_OP_MOTOR_INFO:
+		{
+
+			//
+			// Prepares the response packet
+			//
+
+			// Builds the motor info base packet, this will get the motor-info
+			//  later on.
+			memset(write_buffer, 0, 1000);
+			enc28j60_pkt_t *resp_pkt = (enc28j60_pkt_t *) write_buffer;
+			ip_pkt_t *resp_ip_pkt = (ip_pkt_t *) resp_pkt->eth_pkt.payload;
+			control_pkt_t *resp_control_pkt = pkt_builder_control_reply((u8 *) &resp_pkt->eth_pkt, eth_pkt->hdr.sa, ip_ipv4->sa, 60, CONTROL_PKT_OP_MOTOR_INFO, control_pkt->sn);
+			control_pkt_arg_t *resp_arg = (control_pkt_arg_t *) resp_control_pkt->payload;
+
+			// Adds the stepper motors to the packet
+			u16 resp_payload_size = 0;
+			for(u8 i = 0; i < stepper_motors_count; ++i)
+			{
+				stepper_t *motor = stepper_motors[i];
+
+				control_pkt_arg_motor_t motor_arg = {
+						.id = i,
+						.t = CONTROL_PKT_MOTOR_TYPE_STEPPER,
+						.m = (motor->auto_enable_disable ==true ? CONTROL_PKT_MOTOR_MODE_AUTO : CONTROL_PKT_MOTOR_MODE_MANUAL),
+						.mnsps = motor->min_sps,
+						.mxsps = motor->max_sps
+				};
+
+				resp_payload_size += sizeof(control_pkt_arg_t) + sizeof (control_pkt_arg_motor_t);
+				resp_arg = control_pkt_arg_add_motor(resp_arg, &motor_arg);
+			}
+
+			resp_arg = control_pkt_arg_end(resp_arg);
+			resp_payload_size += sizeof (control_pkt_arg_t);
+
+			//
+			// Finishes the response packet and transmits
+			//
+
+			pkt_builder_control_reply_finish(resp_ip_pkt, resp_payload_size);
+			enc28j60_write(resp_pkt, BSWAP16(resp_ip_pkt->hdr.tl));
+
+			break;
+		}
+	}
+}
+
+void udp_packet_callback(ethernet_pkt_t *eth_pkt)
+{
+	ip_pkt_t *ip_pkt = (ip_pkt_t *) eth_pkt->payload;
+	ip_ipv4_body_t *ip_ipv4 = (ip_ipv4_body_t *) ip_pkt->payload;
+	udp_pkt_t *udp_pkt = (udp_pkt_t *) ip_ipv4->payload;
+
+	switch (BSWAP16(udp_pkt->hdr.dp))
+	{
+		case DISCOVER_PKT_PORT:
+		{
+
+			discover_pkt_t *discover_pkt = (discover_pkt_t *) udp_pkt->payload;
+
+			// Checks if the packet is meant for us
+			if (discover_pkt->op != DISCOVER_OPCODE_REQUEST) break;
+			else if (memcmp(discover_pkt->p, discover_pkt_prefix(), 3) != 0) break;
+
+
+			// Builds the response
+			memset(write_buffer, 0, 1000);
+			enc28j60_pkt_t *resp_pkt = (enc28j60_pkt_t *) write_buffer;
+			ip_pkt_t *resp_ip_pkt = (ip_pkt_t *) resp_pkt->eth_pkt.payload;
+
+			// Prepares the discover packet
+			pkt_builer_discover((u8 *) &resp_pkt->eth_pkt,
+					eth_pkt->hdr.sa, ip_ipv4->sa, 60, config.vstring);
+
+			// Finishes the discover packet, and writes it back
+			pkt_builer_discover_finish(resp_ip_pkt);
+			enc28j60_write(resp_pkt, BSWAP16(resp_ip_pkt->hdr.tl));
+			LOGGER_INFO(LABEL, "Responded to Discover\n");
+
+			break;
+		}
+		case CONTROL_PORT:
+		{
+			control_pkt_t *control_pkt = (control_pkt_t *) udp_pkt->payload;
+			if (!control_pkt_check_prefix(control_pkt)) return;
+			else if (control_pkt->type != CONTROL_PKT_TYPE_REQUEST) return;
+			manager_handle_control_packet(eth_pkt);
+		}
+		default: break;
+	}
+}
 
 /**
  * Configures the steppers and their GPIO Ports
@@ -133,48 +374,10 @@ int main(void)
 	usart2_init(500000);
 	manager_init();
 
-//	steppers_init();
-//	stepper_enable(&stepper0);
+	steppers_init();
+	stepper_enable(&stepper0);
 
-	/*
-	// Servo Test
-
-	// Enables TIM10 in RCC
-	*RCC_APB2ENR |= (_BV(RCC_APB2ENR_TIM10EN));
-
-	// Pulse Width Modulation mode allows to generate a signal with a frequency determined by
-	//  the value of the TIMx_ARR register and a duty cycle determined by the value of the
-	//  TIMx_CCRx register.
-
-	*TIM_ARR(TIM10_BASE) = 180;
-	*TIM_CCR1(TIM10_BASE) = 0;
-
-	// The PWM mode can be selected independently on each channel (one PWM per OCx
-	//  output) by writing ‘110’ (PWM mode 1) or ‘111’ (PWM mode 2) in the OCxM bits in the
-	//  TIMx_CCMRx register. The corresponding preload register must be enabled by setting the
-	//  OCxPE bit in the TIMx_CCMRx register, and eventually the auto-reload preload register (in
-	//  upcounting or center-aligned modes) by setting the ARPE bit in the TIMx_CR1 register.
-
-	*TIM_CCMR1(TIM10_BASE) = (TIM_CCMR1_OC1M(0b001)		// CH1 = Active on match
-			| _BV(TIM_CCMR1_OC1PE));
-	*TIM_CR1(TIM10_BASE) = (_BV(TIM_CR1_ARPE));
-
-	// As the preload registers are transferred to the shadow registers only when an update event
-	//  occurs, before starting the counter, all registers must be initialized by setting the UG bit in
-	//  the TIMx_EGR register.
-
-	*TIM_EGR(TIM10_BASE) |= (_BV(TIM_EGR_UG));
-
-	// The OCx polarity is software programmable using the CCxP bit in the TIMx_CCER register.
-	//  It can be programmed as active high or active low. The OCx output is enabled by the CCxE
-	//  bit in the TIMx_CCER register. Refer to the TIMx_CCERx register description for more
-	//  details.
-
-	*TIM_CCER &= ~(_BV(TIM_CCER_CC1P)); 		// OC1 Active High
-
-	for (;;);
-	*/
-
+	servo_init();
 
 	// Prints the MAC address
 	for (;;)

@@ -112,7 +112,7 @@ typedef struct __attribute__ (( packed ))
 #define TIM_CCMR1_OC2PE			11
 #define TIM_CCMR1_OC2CE			15
 
-#define TIM_CCMR1_OC1M(A)		(A << 4)
+#define TIM_CCMR1_OC1M(A)		((A & 0x7) << 4)
 #define TIM_CCMR1_OC1M_MASK		TIM_CCMR1_OC1M(0b111)
 
 #define TIM_CCMR1_CC1S(A)		(A << 0)

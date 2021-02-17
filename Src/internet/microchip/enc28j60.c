@@ -100,6 +100,8 @@ u16 enc28j60_fifo_read_packet(enc28j60_fifo_t *fifo, ethernet_pkt_t *pkt)
  */
 void EXTI0_IRQHandler(void)
 {
+	*GPIO_ODR(GPIOA_BASE) |= _BV(4);
+
 	// Clears the pending flag for the EXTI0
 	*EXTI_PR |= (_BV(0));
 
@@ -162,11 +164,8 @@ void EXTI0_IRQHandler(void)
 				memcmp(ip_ipv4->da, config.ipv4_broadcast, 4) != 0) return;
 
 			// Stores the packet in the IP FIFO
-
 			if (!enc28j60_fifo_write_packet(&__ip_fifo, pkt, pkt_size))
-			{
 				LOGGER_INFO(label, "IPv4 FIFO Full\n");
-			}
 
 			break;
 		}
@@ -186,11 +185,9 @@ void EXTI0_IRQHandler(void)
 				memcmp(arp_ipv4->tpa, config.ipv4_address, 4) != 0) return;
 
 			// Stores the packet in the system FIFO
-			LOGGER_INFO(label, "System FIFO: %u write\n", pkt_size);
 			if (!enc28j60_fifo_write_packet(&__system_fifo, pkt, pkt_size))
-			{
 				LOGGER_INFO(label, "System FIFO Full\n");
-			}
+
 			break;
 		}
 
@@ -205,6 +202,9 @@ void EXTI0_IRQHandler(void)
 
 	// Clears the interrupt flag on the ENC28J60
 	enc28j60_bfc(ENC28J60_ESTAT, _BV(ENC28J60_ESTAT_INT));
+
+	// INT LED low
+	*GPIO_ODR(GPIOA_BASE) &= ~_BV(4);
 }
 
 /*********************************************
@@ -245,6 +245,18 @@ inline void __enc28j60_gpio_init(void)
 	// Make PA0 input, and perform pull down
 	*GPIO_MODER(GPIOA_BASE) &= ~(GPIO_MODE(0, GPIO_MODE_RESET));
 	*GPIO_PUPDR(GPIOA_BASE) |= GPIO_PUPD(0, GPIO_PUPD_PULL_DOWN);
+
+	//
+	// Configures status GPIO
+	//
+
+	// Make PA1 output ( Error / Initialization )
+	*GPIO_MODER(GPIOA_BASE) &= ~(GPIO_MODE(1, GPIO_MODE_RESET));
+	*GPIO_MODER(GPIOA_BASE) |= (GPIO_MODE(1, GPIO_MODE_OUTPUT));
+
+	// Make PA4 output ( Interrupt )
+	*GPIO_MODER(GPIOA_BASE) &= ~(GPIO_MODE(4, GPIO_MODE_RESET));
+	*GPIO_MODER(GPIOA_BASE) |= (GPIO_MODE(4, GPIO_MODE_OUTPUT));
 }
 
 inline void __enc28j60_spi_init(void)
@@ -631,6 +643,8 @@ inline void __enc28j60_filters_init(void)
 
 void enc28j60_init(void)
 {
+	*GPIO_ODR(GPIOA_BASE) |= _BV(1);
+
 	// Performs full system reset
 	enc28j60_src();
 
@@ -656,6 +670,8 @@ void enc28j60_init(void)
 	// Enables the interrupts
 	__enc28j60_interrupt_init();
 	__enc28j60_filters_init();
+
+	*GPIO_ODR(GPIOA_BASE) &= ~_BV(1);
 }
 
 void enc28j60_phy_init(void)

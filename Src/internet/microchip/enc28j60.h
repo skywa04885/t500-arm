@@ -1,3 +1,9 @@
+/*
+	STM32 ProjectA source code, made by Skywa04885... All Rights Reserved !
+
+	contact: sw04885@fannst.nl
+*/
+
 #ifndef _SRC_INTERNET_MICROCHIP_ENC28J60_H
 #define _SRC_INTERNET_MICROCHIP_ENC28J60_H
 

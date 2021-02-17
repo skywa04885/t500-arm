@@ -11,6 +11,7 @@
 #include "delay.h"
 #include "clock_init.h"
 #include "internet/manager.h"
+#include "servo.h"
 
 #endif
 
